@@ -6,6 +6,7 @@ from torchvision.models.detection import retinanet_resnet50_fpn
 from torchvision.models.detection import RetinaNet_ResNet50_FPN_Weights
 from pathlib import Path
 from transformers import DetrImageProcessor, DetrForObjectDetection 
+import torch
 
 
 
@@ -20,7 +21,6 @@ class ModelLoader:
         model_path.parent.mkdir(parents=True, exist_ok=True)
 
         if pretrained: 
-
             model = YOLO(str(model_path))
         
         else:
@@ -55,15 +55,14 @@ class ModelLoader:
 
         return model
         
-    def load_retinanet_pipeline(self, pretrained=True):
-        if pretrained:
-            weights = RetinaNet_ResNet50_FPN_Weights.DEFAULT
-        else:
-            weights = None
+    def load_retinanet_pipeline(self, 
+                                pretrained=True,
+                                weights= RetinaNet_ResNet50_FPN_Weights.DEFAULT):
         
-        preprocess = weights.transforms() if pretrained else None
+        preprocess = weights.transforms() 
+        
         model = retinanet_resnet50_fpn(
-            weights=weights, 
+            weights=weights if pretrained else None, 
             score_thresh=0.7 
         )
         
@@ -71,11 +70,12 @@ class ModelLoader:
     
     def load_detr_pipeline(self, pretrained=True):
         
-        processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
+        processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50") if pretrained else DetrImageProcessor()
         
         if pretrained:
             model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50")
         else:
             model = DetrForObjectDetection(DetrForObjectDetection.config_class())
         
-        return(processor, model)
+        return(processor, model) 
+  
