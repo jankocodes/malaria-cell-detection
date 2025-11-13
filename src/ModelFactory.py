@@ -5,6 +5,7 @@ from torchvision.models.detection import retinanet_resnet50_fpn
 # import yolov5 # For YOLOv5 (if using PyTorch Hub or custom repo)
 from torchvision.models.detection import RetinaNet_ResNet50_FPN_Weights
 from pathlib import Path
+from transformers import DetrImageProcessor, DetrForObjectDetection 
 
 
 
@@ -68,3 +69,13 @@ class ModelLoader:
         
         return (preprocess, model)
     
+    def load_detr_pipeline(self, pretrained=True):
+        
+        processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
+        
+        if pretrained:
+            model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50")
+        else:
+            model = DetrForObjectDetection(DetrForObjectDetection.config_class())
+        
+        return(processor, model)
