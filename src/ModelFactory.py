@@ -54,3 +54,17 @@ class ModelLoader:
 
         return model
         
+    def load_retinanet_pipeline(self, pretrained=True):
+        if pretrained:
+            weights = RetinaNet_ResNet50_FPN_Weights.DEFAULT
+        else:
+            weights = None
+        
+        preprocess = weights.transforms() if pretrained else None
+        model = retinanet_resnet50_fpn(
+            weights=weights, 
+            score_thresh=0.7 
+        )
+        
+        return (preprocess, model)
+    
