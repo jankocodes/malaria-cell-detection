@@ -32,3 +32,25 @@ class ModelLoader:
 
         return model
     
+    def load_yolo_v5(self, 
+                     repo_path: str = "models/yolov5",
+                     pretrained: bool = False,
+                     weights_path= None) -> str:
+        
+        if pretrained:
+                model = torch.hub.load(
+                repo_or_dir= repo_path, # the YOLOv5 repo
+                model="custom", # tells it to use a local weights file
+                source= "local",
+                path=str(repo_path)+"/yolov5s.pt",
+                autoshape= False
+    )
+        else: 
+            model = torch.hub.load(repo_or_dir= repo_path,
+                               model="yolov5s",
+                               source="local",
+                               autoshape=False, pretrained=False) # load scratch
+
+
+        return model
+        
