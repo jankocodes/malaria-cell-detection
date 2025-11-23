@@ -1,28 +1,66 @@
-# TODO
 import os
 import json
 from torch.utils.data import Dataset
 import cv2
+import pandas as pd
 
 
 class BloodCellDataset(Dataset):
+    """
+    BloodCellDataset class for loading blood cell images and their annotations.
+
+    This class extends PyTorch's Dataset class to load images and corresponding
+    bounding box annotations from a JSON file. It's designed to work with datasets
+    in COCO format.
+
+    Attributes:
+        annotations (dict): Dictionary containing image metadata and annotations loaded from JSON.
+        images (list): List of image metadata dictionaries.
+        bounding_boxes (dict): Mapping from image_id to list of annotation dictionaries.
+        img_dir (str): Path to directory containing the image files.
+        transform (callable, optional): Function to apply transformations to images.
+        target_transform (callable, optional): Function to apply transformations to labels/annotations.
+
+    Args:
+        annotations_file (str): Path to the JSON file containing COCO format annotations.
+        img_dir (str): Path to the directory containing the image files.
+        transform (callable, optional): Optional transform to be applied on images. Default: None
+        target_transform (callable, optional): Optional transform to be applied on labels. Default: None
+
+    Methods:
+        __len__(): Returns the total number of images in the dataset.
+        __getitem__(idx): Returns the image and its corresponding bounding box annotations at index idx.
+
+    Returns:
+        tuple: (image, label) where image is the loaded image array and label is the list of annotations.
+    """
+
     def __init__(
         self, annotations_file, img_dir, transform=None, target_transform=None
     ):
         with open(annotations_file, "r") as f:
             self.annotations = json.load(f)
-        self.img_labels = self.annotations["images"]
+        self.images = self.annotations["images"]
+        self.bounding_boxes = dict()
         self.img_dir = img_dir
         self.transform = transform
         self.target_transform = target_transform
 
+        # Create a mapping from image_id to its annotations
+        for annotation in self.annotations["annotations"]:
+            image_id = annotation["image_id"]
+            if image_id not in self.bounding_boxes:
+                self.bounding_boxes[image_id] = []
+            self.bounding_boxes[image_id].append(annotation)
+
     def __len__(self):
-        return len(self.img_labels)
+        return len(self.images)
 
     def __getitem__(self, idx):
-        img_path = os.path.join(self.img_dir, self.img_labels[idx]["file_name"])
+        img_path = os.path.join(self.img_dir, self.images[idx]["file_name"])
         image = cv2.imread(img_path)
-        label = self.img_labels[idx]
+        label = self.bounding_boxes[self.images[idx]["id"]]
+
         if self.transform:
             image = self.transform(image)
         if self.target_transform:
