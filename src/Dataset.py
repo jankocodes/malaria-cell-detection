@@ -2,7 +2,23 @@ import os
 import json
 from torch.utils.data import Dataset
 import cv2
-import pandas as pd
+import torch
+from yolov5.utils.augmentations import letterbox
+
+
+def default_transform(img):
+    # 1️⃣ Resize and pad to model input
+    img = letterbox(img, new_shape=640, stride=32)[0]
+
+    # 2️⃣ BGR -> RGB, HWC -> CHW
+    img = (
+        img[:, :, ::-1].transpose(2, 0, 1).copy()
+    )  # ⚠ make a copy to avoid negative strides
+
+    # 3️⃣ Convert to float tensor and scale 0-1
+    img = torch.from_numpy(img).float() / 255.0
+
+    return img
 
 
 class BloodCellDataset(Dataset):
@@ -36,7 +52,11 @@ class BloodCellDataset(Dataset):
     """
 
     def __init__(
-        self, annotations_file, img_dir, transform=None, target_transform=None
+        self,
+        annotations_file,
+        img_dir,
+        transform=default_transform,
+        target_transform=None,
     ):
         with open(annotations_file, "r") as f:
             self.annotations = json.load(f)
