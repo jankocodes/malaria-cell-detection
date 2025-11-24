@@ -1,4 +1,5 @@
-import torch
+import sys
+from pathlib import Path
 
 # Import all necessary libraries for the models
 from ultralytics import YOLO  # For YOLOv8
@@ -72,7 +73,7 @@ class ModelFactory:
         repo_path: str = "ultralytics/yolov5",
         pretrained: bool = True,
         model_name: str = "yolov5s",
-        weight_path: str = "models/yolov5",
+        weight_path: str = "../models/yolov5",
     ) -> DetectMultiBackend:
 
         if pretrained:
