@@ -1,3 +1,10 @@
 docs
 data/*
 notesw
+*_test.py
+models/*/*
+runs
+.idea
+*.pyc
+.DS_Store
+*.pt

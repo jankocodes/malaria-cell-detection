@@ -13,7 +13,36 @@ import torch
 from yolov5.models.common import DetectMultiBackend
 
 
-class ModelLoader:
+class ModelFactory:
+    """
+    Lightweight factory for loading object-detection models.
+
+    Supports YOLOv8, YOLOv5, RetinaNet, and DETR architectures.
+    Methods return either model instances or (preprocessor, model) tuples.
+    Models are not automatically moved to the specified device.
+
+    Attributes:
+        device (str): The device to use for model inference ('cuda' or 'cpu').
+                     Defaults to 'cuda' if available, otherwise 'cpu'.
+
+    Methods:
+        load_yolo_v8(pretrained, model_name, model_dir) -> YOLO:
+            Load a YOLOv8 model. If pretrained=True, loads weights from model_dir.
+            Otherwise, loads from YAML configuration file.
+
+        load_yolo_v5(repo_path, pretrained, model_name, weight_path) -> DetectMultiBackend:
+            Load a YOLOv5 model from torch.hub. If pretrained=True, loads custom weights
+            from weight_path. Otherwise, loads the base model without pretrained weights.
+
+        load_retinanet_pipeline(pretrained, weights) -> tuple[Callable, RetinaNet]:
+            Load a RetinaNet model with its preprocessing pipeline.
+            Returns a tuple of (preprocessor, model).
+
+        load_detr_pipeline(pretrained, weights) -> tuple[DetrImageProcessor, DetrForObjectDetection]:
+            Load a DETR model with its image processor.
+            Returns a tuple of (processor, model).
+    """
+
     def __init__(self, device="cuda" if torch.cuda.is_available() else "cpu"):
         self.device = device
         print(f"Model factory initialized. Using device: {self.device}")
