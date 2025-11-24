@@ -60,18 +60,27 @@ class BloodCellDataset(Dataset):
     ):
         with open(annotations_file, "r") as f:
             self.annotations = json.load(f)
-        self.images = self.annotations["images"]
-        self.bounding_boxes = dict()
         self.img_dir = img_dir
         self.transform = transform
         self.target_transform = target_transform
 
+        self.images = self.annotations["images"]
+        self.target = dict()
+        self.target_categories = {"bbox", "category_id", "iscrowd", "area"}
+
         # Create a mapping from image_id to its annotations
         for annotation in self.annotations["annotations"]:
             image_id = annotation["image_id"]
-            if image_id not in self.bounding_boxes:
-                self.bounding_boxes[image_id] = []
-            self.bounding_boxes[image_id].append(annotation)
+
+            # Initialize target entry if not present
+            if image_id not in self.target:
+                self.target[image_id] = dict()
+                for cat in self.target_categories:
+                    self.target[image_id][cat] = []
+
+            # Append annotation details to the corresponding image_id
+            for cat in self.target_categories:
+                self.target[image_id][cat].append(annotation[cat])
 
     def __len__(self):
         return len(self.images)
@@ -79,11 +88,20 @@ class BloodCellDataset(Dataset):
     def __getitem__(self, idx):
         img_path = os.path.join(self.img_dir, self.images[idx]["file_name"])
         image = cv2.imread(img_path)
-        label = self.bounding_boxes[self.images[idx]["id"]]
+        img_id = self.images[idx]["id"]  # unequal to idx (idx=0 -> img_id=1)
+        target = self.target[img_id]
 
         if self.transform:
             image = self.transform(image)
         if self.target_transform:
-            label = self.target_transform(label)
+            target = self.target_transform(target)
 
-        return image, label
+        target = {
+            "boxes": torch.as_tensor(target["bbox"], dtype=torch.float32),
+            "labels": torch.as_tensor(target["category_id"], dtype=torch.int64),
+            "image_id": torch.tensor([img_id]),
+            "area": torch.as_tensor(target["area"], dtype=torch.float32),
+            "iscrowd": torch.as_tensor(target["iscrowd"], dtype=torch.int64),
+        }
+
+        return image, target
