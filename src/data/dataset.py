@@ -66,7 +66,9 @@ class BloodCellDataset(Dataset):
 
         self.images = self.annotations["images"]
         self.target = dict()
-        self.target_categories = {"bbox", "category_id", "iscrowd", "area"}
+        self.annotation_categories = {"bbox", "category_id", "iscrowd", "area"}
+        self.unique_labels = set()
+        self.label_mapping = dict()
 
         # Create a mapping from image_id to its annotations
         for annotation in self.annotations["annotations"]:
