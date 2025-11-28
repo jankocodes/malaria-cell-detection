@@ -3,7 +3,7 @@ from tqdm import tqdm
 from od_utils.data import format_batch_targets
 
 
-def train_one_epoch(model, train_loader, val_loader, loss_fn, optimizer, epoch):
+def train_one_epoch(model, train_loader, val_loader, optimizer, epoch):
     device = model.device
 
     # --- Training ---
@@ -14,15 +14,16 @@ def train_one_epoch(model, train_loader, val_loader, loss_fn, optimizer, epoch):
 
     for images, targets in pbar:
         images = images.float().to(device)
-        targets_tensor = format_batch_targets(targets, images.shape[2:], device)
 
-        if len(targets_tensor) == 0:
+        if len(targets) == 0:
             continue
 
         # Forward
         preds = model(images)  # 3 x [B, A, H, W, no]
 
-        train_loss, (lbox, lobj, lcls) = loss_fn(preds, targets_tensor)
+        train_loss, (lbox, lobj, lcls) = model.compute_loss(
+            preds, targets, images.shape[2:]
+        )
 
         optimizer.zero_grad()
         train_loss.backward()
@@ -42,15 +43,15 @@ def train_one_epoch(model, train_loader, val_loader, loss_fn, optimizer, epoch):
         for images, targets in pbar:
             images = images.float().to(device)
 
-            targets_tensor = format_batch_targets(targets, images.shape[2:], device)
-
-            if len(targets_tensor) == 0:
+            if len(targets) == 0:
                 continue
 
             # Forward
             preds = model(images)  # 3 x [B, A, H, W, no]
 
-            val_loss, (lbox, lobj, lcls) = loss_fn(preds, targets_tensor)
+            val_loss, (lbox, lobj, lcls) = model.compute_loss(
+                preds, targets, images.shape[2:]
+            )
 
             total_val_loss += val_loss.item()
 

@@ -18,7 +18,7 @@ DATASET_PATH = "data/raw/vogelbacher23/dataset_segmentation"
 if __name__ == "__main__":
 
     # --- Load Model ---
-    model = ModelFactory().load_yolo_v5(pretrained=False)
+    model = ModelFactory().load_yolo_v5(pretrained=True, device=DEVICE)
 
     # --- Load Data ---
     train_dataset = BloodCellDataset(
@@ -50,16 +50,12 @@ if __name__ == "__main__":
     # --- Optimizer ---
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
 
-    # --- Loss Function ---
-    loss_fn = ComputeLoss(model.model)
-
     # --- Training Loop ---
     for epoch in range(NUM_EPOCHS):
         result = train_one_epoch(
             model=model,
             train_loader=train_loader,
             val_loader=val_loader,
-            loss_fn=loss_fn,
             optimizer=optimizer,
             epoch=epoch,
         )
