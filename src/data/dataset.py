@@ -77,12 +77,18 @@ class BloodCellDataset(Dataset):
             # Initialize target entry if not present
             if image_id not in self.target:
                 self.target[image_id] = dict()
-                for cat in self.target_categories:
+                for cat in self.annotation_categories:
                     self.target[image_id][cat] = []
 
             # Append annotation details to the corresponding image_id
-            for cat in self.target_categories:
+            for cat in self.annotation_categories:
                 self.target[image_id][cat].append(annotation[cat])
+
+            self.unique_labels.add(annotation["category_id"])
+
+        # Create class_id mapping
+        for i, label in enumerate(self.unique_labels):
+            self.label_mapping[label] = i
 
     def __len__(self):
         return len(self.images)
@@ -100,7 +106,10 @@ class BloodCellDataset(Dataset):
 
         target = {
             "boxes": torch.as_tensor(target["bbox"], dtype=torch.float32),
-            "labels": torch.as_tensor(target["category_id"], dtype=torch.int64),
+            "labels": torch.as_tensor(
+                [self.label_mapping.get(id) for id in target["category_id"]],
+                dtype=torch.int64,
+            ),
             "image_id": torch.tensor([img_id]),
             "area": torch.as_tensor(target["area"], dtype=torch.float32),
             "iscrowd": torch.as_tensor(target["iscrowd"], dtype=torch.int64),
