@@ -74,6 +74,7 @@ class ModelFactory:
         pretrained: bool = True,
         model_name: str = "yolov5s",
         weight_path: str = "models/yolov5",
+        num_classes: int = 7,
     ) -> DetectMultiBackend:
 
         model = torch.hub.load(
@@ -86,6 +87,34 @@ class ModelFactory:
         if not pretrained:
             print("⚠ Resetting all YOLOv5 model weights to random initialization...")
             model.model.apply(self._reset_weights)
+
+        # -----------------------------
+        # 🔥 MODIFY NUMBER OF CLASSES
+        # -----------------------------
+        model.nc = num_classes
+        model.names = [f"class_{i}" for i in range(num_classes)]
+
+        # Update Detect() module inside model.model
+        detect_layer = model.model.model[-1]  # YOLO head is always the last layer
+
+        # Set new class count
+        detect_layer.nc = num_classes
+        detect_layer.no = num_classes + 5  # x,y,w,h,obj + classes
+
+        # Re-create conv layers for each detection head
+        detect_layer.m = torch.nn.ModuleList(
+            [
+                torch.nn.Conv2d(
+                    x.in_channels, detect_layer.no * len(detect_layer.anchors[i]), 1
+                )
+                for i, x in enumerate(detect_layer.m)
+            ]
+        )
+
+        # Reset bias/weights
+        for m in detect_layer.m:
+            torch.nn.init.normal_(m.weight, mean=0.0, std=0.02)
+            torch.nn.init.zeros_(m.bias)
 
         return model
 
