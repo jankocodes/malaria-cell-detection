@@ -73,23 +73,26 @@ class ModelFactory:
         repo_path: str = "ultralytics/yolov5",
         pretrained: bool = True,
         model_name: str = "yolov5s",
-        weight_path: str = "../models/yolov5",
+        weight_path: str = "models/yolov5",
     ) -> DetectMultiBackend:
 
-        if pretrained:
-            model = torch.hub.load(
-                repo_path,
-                "custom",
-                autoshape=False,
-                path=f"{weight_path}/{model_name}.pt",
-            )
+        model = torch.hub.load(
+            repo_path,
+            "custom",
+            autoshape=False,
+            path=f"{weight_path}/{model_name}.pt",
+        )
 
-        else:
-            model = torch.hub.load(
-                repo_path, model_name, pretrained=False, autoshape=False
-            )
+        if not pretrained:
+            print("⚠ Resetting all YOLOv5 model weights to random initialization...")
+            model.model.apply(self._reset_weights)
 
         return model
+
+    def _reset_weights(self, m):
+        """Reset weights of Conv, BN, Linear, etc."""
+        if hasattr(m, "reset_parameters"):
+            m.reset_parameters()
 
     def load_retinanet_pipeline(
         self, pretrained=True, weights=RetinaNet_ResNet50_FPN_Weights.DEFAULT
