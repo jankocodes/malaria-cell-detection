@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
 from typing import Dict, List, Optional, Tuple, Any
+from .base import BaseDetectionModel
 
 
-class YOLOv5Wrapper(nn.Module):
+class YOLOv5Wrapper(BaseDetectionModel):
     """
     Wrapper for YOLOv5 model that provides:
     - Clean forward() method that returns raw predictions
@@ -182,11 +183,3 @@ class YOLOv5Wrapper(nn.Module):
         bw = (x2 - x1) / w
         bh = (y2 - y1) / h
         return torch.stack([cx, cy, bw, bh], dim=1)
-
-    def train(self, mode: bool = True):
-        self.model.train(mode)
-        return self.model
-
-    def eval(self):
-        self.model.train(False)
-        return self.model

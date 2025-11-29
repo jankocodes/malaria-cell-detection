@@ -1,0 +1,62 @@
+import torch
+import torch.nn as nn
+from abc import ABC, abstractmethod
+from typing import Dict, List, Optional, Tuple, Any
+
+
+class BaseDetectionModel(ABC, nn.Module):
+    """Abstract base class for object detection models."""
+
+    def __init__(self):
+        super().__init__()
+        self.model = None
+        self.num_classes = None
+
+    @abstractmethod
+    def forward(
+        self,
+        images: torch.Tensor,
+        targets: Optional[List[Dict[str, torch.Tensor]]] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass of the model.
+
+        Args:
+            images: Batch of images [B, C, H, W]
+            targets: List of dicts with 'boxes' [N, 4] and 'labels' [N]
+                    Only required during training
+
+        Returns:
+            During training: Dict with losses {'loss': total_loss, 'box_loss': ..., 'cls_loss': ...}
+            During inference: Dict with predictions {'boxes': ..., 'scores': ..., 'labels': ...}
+        """
+        pass
+
+    @abstractmethod
+    def compute_loss(
+        self, predictions: Any, targets: List[Dict[str, torch.Tensor]]
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Compute model-specific loss.
+
+        Args:
+            predictions: Raw model outputs
+            targets: Ground truth targets
+
+        Returns:
+            Dict of losses with at least 'total_loss' key
+        """
+        pass
+
+    def train(self, mode: bool = True):
+        """Override train mode to ensure proper behavior."""
+        super().train(mode)
+        if self.model is not None:
+            self.model.train(mode)
+        return self
+
+    def eval(self):
+        super().eval()
+        if self.model is not None:
+            self.model.train(False)
+        return self
