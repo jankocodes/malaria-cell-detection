@@ -121,7 +121,7 @@ class YOLOv5Wrapper(BaseDetectionModel):
                   [B, 3, H/8,  W/8,  5 + num_classes],
                   [B, 3, H/16, W/16, 5 + num_classes],
                   [B, 3, H/32, W/32, 5 + num_classes]
-                - Inference (flattened): [B, num_predictions, 5 + num_classes]
+                - Inference (flattened): None
             'loss' :
                 - Loss returned by compute_loss when targets are provided.
                 - None if targets is omitted (inference mode).
@@ -135,10 +135,9 @@ class YOLOv5Wrapper(BaseDetectionModel):
         pred = self.model(images)
 
         if self.training:
-            loss = self.compute_loss(pred, targets, images.shape[2:])
+            loss, _ = self.compute_loss(pred, targets, images.shape[2:])
 
             return {
-                "predictions": pred,
                 "loss": loss,
             }
 

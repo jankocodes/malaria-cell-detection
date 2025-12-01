@@ -21,7 +21,7 @@ def train_one_epoch(model, train_loader, val_loader, optimizer, epoch):
         # Forward
         result = model(images, targets)  # 3 x [B, A, H, W, no]
 
-        train_loss, (lbox, lobj, lcls) = result["loss"]
+        train_loss = result["loss"]
 
         optimizer.zero_grad()
         train_loss.backward()
