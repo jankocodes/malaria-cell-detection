@@ -13,6 +13,7 @@ from transformers import DetrImageProcessor, DetrForObjectDetection
 import torch
 from yolov5.models.common import DetectMultiBackend
 from wrappers.yolov5 import YOLOv5Wrapper
+from wrappers.retinanet import RetinaNetWrapper
 
 
 class ModelFactory:
@@ -72,7 +73,6 @@ class ModelFactory:
 
     def load_yolo_v5(
         self,
-        device,
         repo_path: str = "ultralytics/yolov5",
         pretrained: bool = True,
         model_name: str = "yolov5s",
@@ -94,7 +94,7 @@ class ModelFactory:
         return YOLOv5Wrapper(
             model=model,
             num_classes=num_classes,
-            device=device,
+            device=self.device,
         )
 
     def _reset_weights(self, m):
@@ -103,16 +103,24 @@ class ModelFactory:
             m.reset_parameters()
 
     def load_retinanet_pipeline(
-        self, pretrained=True, weights=RetinaNet_ResNet50_FPN_Weights.DEFAULT
+        self,
+        pretrained=True,
+        weights=RetinaNet_ResNet50_FPN_Weights.DEFAULT,
+        num_classes=7,
     ) -> RetinaNet:
 
         preprocess = weights.transforms()
 
         model = retinanet_resnet50_fpn(
-            weights=weights if pretrained else None, score_thresh=0.7
+            weights=weights if pretrained else None,
+            score_thresh=0.7,
         )
 
-        return (preprocess, model)
+        return RetinaNetWrapper(
+            model=model,
+            num_classes=num_classes,
+            device=self.device,
+        )
 
     def load_detr_pipeline(
         self, pretrained=True, weights="facebook/detr-resnet-50"
