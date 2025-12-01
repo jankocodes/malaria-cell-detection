@@ -37,22 +37,6 @@ class BaseDetectionModel(ABC, nn.Module):
         pass
 
     @abstractmethod
-    def compute_loss(
-        self, predictions: Any, targets: List[Dict[str, torch.Tensor]]
-    ) -> Dict[str, torch.Tensor]:
-        """
-        Compute model-specific loss.
-
-        Args:
-            predictions: Raw model outputs
-            targets: Ground truth targets
-
-        Returns:
-            Dict of losses with at least 'total_loss' key
-        """
-        pass
-
-    @abstractmethod
     def _set_num_classes(self, num_classes: int):
         pass
 

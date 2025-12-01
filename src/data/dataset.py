@@ -116,18 +116,3 @@ class BloodCellDataset(Dataset):
         }
 
         return image, target
-
-
-if __name__ == "__main__":
-
-    with open("data/raw/vogelbacher23/dataset_segmentation/train.json", "r") as f:
-        annotations = json.load(f)
-
-    print(annotations["images"][0])
-
-    dataset = BloodCellDataset(
-        annotations_file="data/raw/vogelbacher23/dataset_segmentation/train.json",
-        img_dir="data/raw/vogelbacher23/dataset_segmentation/train",
-    )
-    img, label = dataset[0]
-    print(label)

@@ -19,11 +19,9 @@ def train_one_epoch(model, train_loader, val_loader, optimizer, epoch):
             continue
 
         # Forward
-        preds = model(images)  # 3 x [B, A, H, W, no]
+        result = model(images, targets)  # 3 x [B, A, H, W, no]
 
-        train_loss, (lbox, lobj, lcls) = model.compute_loss(
-            preds, targets, images.shape[2:]
-        )
+        train_loss, (lbox, lobj, lcls) = result["loss"]
 
         optimizer.zero_grad()
         train_loss.backward()

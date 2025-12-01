@@ -206,7 +206,6 @@ class YOLOv5Wrapper(BaseDetectionModel):
             labels = t["labels"].unsqueeze(1)
             img_idx = torch.full((len(labels), 1), i)
 
-            print(boxes)
             xywh = xyxy_to_xywh_norm(boxes, img_size, self.device)
             merged = torch.cat([img_idx, labels.to(device), xywh.to(device)], dim=1)
 

@@ -18,7 +18,7 @@ DATASET_PATH = "data/raw/vogelbacher23/dataset_segmentation"
 if __name__ == "__main__":
 
     # --- Load Model ---
-    model = ModelFactory().load_yolo_v5(pretrained=True, device=DEVICE)
+    model = ModelFactory(device=DEVICE).load_yolo_v5(pretrained=True)
 
     # --- Load Data ---
     train_dataset = BloodCellDataset(
