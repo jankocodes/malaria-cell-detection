@@ -7,10 +7,14 @@ from typing import Dict, List, Optional, Tuple, Any
 class BaseDetectionModel(ABC, nn.Module):
     """Abstract base class for object detection models."""
 
-    def __init__(self):
+    def __init__(self, model, num_classes, device):
         super().__init__()
-        self.model = None
-        self.num_classes = None
+        self.model = model
+        self.num_classes = num_classes
+        self.device = device
+
+        self.train()
+        self._set_num_classes(num_classes)
 
     @abstractmethod
     def forward(
@@ -46,6 +50,10 @@ class BaseDetectionModel(ABC, nn.Module):
         Returns:
             Dict of losses with at least 'total_loss' key
         """
+        pass
+
+    @abstractmethod
+    def _set_num_classes(self, num_classes: int):
         pass
 
     def train(self, mode: bool = True):

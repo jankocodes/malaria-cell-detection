@@ -37,20 +37,16 @@ class YOLOv5Wrapper(BaseDetectionModel):
         device,
         loss_fn: Optional[callable] = None,
     ):
-        super().__init__()
-        self.model = model
-        self.num_classes = num_classes
+        super().__init__(
+            model=model,
+            num_classes=num_classes,
+            device=device,
+        )
         self.loss_fn = loss_fn
-        self.device = device
-
-        # adapt number of classes
-        self._set_num_classes(num_classes)
 
         # Initialize loss computer if not provided
         if self.loss_fn is None:
             self._init_default_loss()
-
-        self.train()
 
     def _init_default_loss(self):
         """Initialize default YOLOv5 loss function."""
