@@ -6,11 +6,28 @@ from .base import BaseDetectionModel
 
 class YOLOv5Wrapper(BaseDetectionModel):
     """
-    Wrapper for YOLOv5 model that provides:
-    - Clean forward() method that returns raw predictions
-    - Separate compute_loss() method for training
-    - Target format conversion utilities
-    - Output post-processing
+    YOLOv5Wrapper - PyTorch wrapper for YOLOv5 object detection models.
+
+    A specialized wrapper that adapts YOLOv5 models to a standardized detection interface,
+    handling model configuration, loss computation, and target format conversion.
+
+    Attributes:
+        model (nn.Module): The underlying YOLOv5 model instance
+        num_classes (int): Number of object classes for detection
+        loss_fn (callable): Loss function for training (ComputeLoss or custom)
+        device: Computation device (CPU or GPU)
+
+    Methods:
+        forward(images, targets): Execute model forward pass and compute loss
+        compute_loss(predictions, targets, img_size): Calculate detection losses
+        _set_num_classes(num_classes): Adapt model architecture for target class count
+        _init_default_loss(): Initialize YOLOv5's native loss function
+        _convert_targets_to_yolo_format(targets, img_size, device): Transform target annotations
+
+    Example:
+        >>> model = YOLOv5Wrapper(yolov5_model, num_classes=80, device='cuda')
+        >>> output = model(images, targets)
+        >>> predictions, loss = output['predictions'], output['loss']
     """
 
     def __init__(
@@ -20,15 +37,6 @@ class YOLOv5Wrapper(BaseDetectionModel):
         device,
         loss_fn: Optional[callable] = None,
     ):
-        """
-        Initialize YOLOv5 wrapper.
-
-        Args:
-            model: Loaded YOLOv5 model (from torch.hub.load)
-            num_classes: Number of detection classes
-            img_size: Input image size (default: 640)
-            loss_fn: Custom loss function. If None, uses default YOLOv5 loss
-        """
         super().__init__()
         self.model = model
         self.num_classes = num_classes
@@ -42,12 +50,13 @@ class YOLOv5Wrapper(BaseDetectionModel):
         if self.loss_fn is None:
             self._init_default_loss()
 
+        self.train()
+
     def _init_default_loss(self):
         """Initialize default YOLOv5 loss function."""
         try:
             from yolov5.utils.loss import ComputeLoss
 
-            print(type(self.model.model))
             self.loss_fn = ComputeLoss(self.model.model)
         except ImportError:
             print("Warning: Could not import YOLOv5 loss. Set loss_fn manually.")
@@ -97,23 +106,47 @@ class YOLOv5Wrapper(BaseDetectionModel):
 
         print(f"✅ Updated model to {num_classes} classes")
 
-    def forward(self, images: torch.Tensor) -> Tuple[torch.Tensor, ...]:
+    def forward(self, images: torch.Tensor, targets) -> dict:
         """
-        Standard PyTorch forward pass - returns raw predictions only.
+        Forward pass — returns raw model predictions and computed loss.
 
         Args:
-            images: Input images [B, 3, H, W]
+            images (torch.Tensor): Batch of input images, shape [B, 3, H, W].
+            targets (List[Dict], optional): Ground-truth annotations per image.
+            Each dict should contain:
+                - 'boxes': Tensor [N, 4] in xyxy pixel coords
+                - 'labels': Tensor [N] class indices
+            Required for training; may be None for inference.
 
         Returns:
-            Tuple of prediction tensors at 3 scales:
-            - [B, 3, H/8, W/8, 5+num_classes]
-            - [B, 3, H/16, W/16, 5+num_classes]
-            - [B, 3, H/32, W/32, 5+num_classes]
+            Dict with:
+            'predictions' :
+                - Training (YOLOv5 multi-scale): list of 3 tensors:
+                  [B, 3, H/8,  W/8,  5 + num_classes],
+                  [B, 3, H/16, W/16, 5 + num_classes],
+                  [B, 3, H/32, W/32, 5 + num_classes]
+                - Inference (flattened): [B, num_predictions, 5 + num_classes]
+            'loss' :
+                - Loss returned by compute_loss when targets are provided.
+                - None if targets is omitted (inference mode).
 
-            Or in inference mode (after model flattening):
-            - [B, num_predictions, 5+num_classes]
+        Notes:
+            - 'predictions' are raw network outputs (anchor/logit space) and require
+              decoding and NMS to produce final detections.
+            - When targets are supplied, compute_loss() is invoked and its result
+              is returned under 'loss'.
         """
-        return self.model(images)
+        pred = self.model(images)
+
+        if self.training:
+            loss = self.compute_loss(pred, targets, images.shape[2:])
+
+            return {
+                "predictions": pred,
+                "loss": loss,
+            }
+
+        return {"predictions": pred}
 
     def compute_loss(
         self,
@@ -155,10 +188,21 @@ class YOLOv5Wrapper(BaseDetectionModel):
         into a single tensor where each row represents an object with its metadata.
 
         """
+
+        def xyxy_to_xywh_norm(boxes, img_shape_hw, device):
+            """Convert xyxy boxes to normalized xywh"""
+            h, w = img_shape_hw
+            boxes = boxes.to(device)
+            x1, y1, x2, y2 = boxes.T
+            cx = (x1 + x2) / 2 / w
+            cy = (y1 + y2) / 2 / h
+            bw = (x2 - x1) / w
+            bh = (y2 - y1) / h
+            return torch.stack([cx, cy, bw, bh], dim=1)
+
         formatted = []
 
         for i, t in enumerate(targets):
-
             if len(t["boxes"]) == 0:
                 continue
 
@@ -166,20 +210,10 @@ class YOLOv5Wrapper(BaseDetectionModel):
             labels = t["labels"].unsqueeze(1)
             img_idx = torch.full((len(labels), 1), i)
 
-            xywh = self._xyxy_to_xywh_norm(boxes, img_size, device)
+            print(boxes)
+            xywh = xyxy_to_xywh_norm(boxes, img_size, self.device)
             merged = torch.cat([img_idx, labels.to(device), xywh.to(device)], dim=1)
 
             formatted.append(merged)
 
         return torch.cat(formatted, dim=0) if len(formatted) else None
-
-    def _xyxy_to_xywh_norm(self, boxes, img_shape_hw, device):
-        """Convert xyxy boxes to normalized xywh"""
-        h, w = img_shape_hw
-        boxes = boxes.to(device)
-        x1, y1, x2, y2 = boxes.T
-        cx = (x1 + x2) / 2 / w
-        cy = (y1 + y2) / 2 / h
-        bw = (x2 - x1) / w
-        bh = (y2 - y1) / h
-        return torch.stack([cx, cy, bw, bh], dim=1)
