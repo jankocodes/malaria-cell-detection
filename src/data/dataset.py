@@ -106,7 +106,7 @@ class BloodCellDataset(Dataset):
 
         target = {
             "boxes": torch.as_tensor(target["bbox"], dtype=torch.float32),
-            "labels": torch.as_tensor(
+            "class_labels": torch.as_tensor(
                 [self.label_mapping.get(id) for id in target["category_id"]],
                 dtype=torch.int64,
             ),

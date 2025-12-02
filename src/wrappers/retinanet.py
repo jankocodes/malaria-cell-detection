@@ -148,6 +148,6 @@ class RetinaNetWrapper(BaseDetectionModel):
             boxes[:, 2] = boxes[:, 0] + boxes[:, 2]  # x2 = x + w
             boxes[:, 3] = boxes[:, 1] + boxes[:, 3]  # y2 = y + h
 
-            converted.append({"boxes": boxes, "labels": t["labels"]})
+            converted.append({"boxes": boxes, "class_labels": t["class_labels"]})
 
         return converted

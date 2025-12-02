@@ -202,7 +202,7 @@ class YOLOv5Wrapper(BaseDetectionModel):
                 continue
 
             boxes = t["boxes"]
-            labels = t["labels"].unsqueeze(1)
+            labels = t["class_labels"].unsqueeze(1)
             img_idx = torch.full((len(labels), 1), i)
 
             xywh = xyxy_to_xywh_norm(boxes, img_size, self.device)
