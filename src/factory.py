@@ -9,11 +9,11 @@ from torchvision.models.detection import retinanet_resnet50_fpn
 from torchvision.models.detection import RetinaNet_ResNet50_FPN_Weights
 from torchvision.models.detection import RetinaNet
 from pathlib import Path
-from transformers import DetrImageProcessor, DetrForObjectDetection
+from transformers import DetrConfig, DetrImageProcessor, DetrForObjectDetection
 import torch
-from yolov5.models.common import DetectMultiBackend
 from wrappers.yolov5 import YOLOv5Wrapper
 from wrappers.retinanet import RetinaNetWrapper
+from wrappers.detr import DetrWrapper
 
 
 class ModelFactory:
@@ -123,7 +123,10 @@ class ModelFactory:
         )
 
     def load_detr_pipeline(
-        self, pretrained=True, weights="facebook/detr-resnet-50"
+        self,
+        pretrained=True,
+        weights="facebook/detr-resnet-50",
+        num_classes=7,
     ) -> tuple[DetrImageProcessor, DetrForObjectDetection]:
 
         processor = (
@@ -133,8 +136,17 @@ class ModelFactory:
         )
 
         if pretrained:
-            model = DetrForObjectDetection.from_pretrained(weights)
-        else:
-            model = DetrForObjectDetection(DetrForObjectDetection.config_class())
+            config = DetrConfig.from_pretrained(weights)
+            config.num_labels = num_classes
 
-        return (processor, model)
+            model = DetrForObjectDetection.from_pretrained(
+                weights, config=config, ignore_mismatched_sizes=True
+            )
+        else:
+            model = DetrForObjectDetection(config=DetrConfig(num_labels=num_classes))
+
+        return DetrWrapper(
+            model=model,
+            num_classes=num_classes,
+            device=self.device,
+        )
