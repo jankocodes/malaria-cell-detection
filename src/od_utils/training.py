@@ -10,7 +10,7 @@ def train_one_epoch(model, train_loader, val_loader, optimizer, epoch):
     model.train()
     total_train_loss = 0
 
-    pbar = tqdm(train_loader, desc=f"Training - Epoch {epoch}")
+    pbar = tqdm(train_loader, desc=f"Training - Epoch {epoch +1}")
 
     for images, targets in pbar:
         images = images.float().to(device)
@@ -35,7 +35,7 @@ def train_one_epoch(model, train_loader, val_loader, optimizer, epoch):
     with torch.no_grad():
         total_val_loss = 0
 
-        pbar = tqdm(val_loader, desc=f"Validation - Epoch {epoch}")
+        pbar = tqdm(val_loader, desc=f"Validation - Epoch {epoch +1}")
 
         # validation
         for images, targets in pbar:
@@ -45,12 +45,9 @@ def train_one_epoch(model, train_loader, val_loader, optimizer, epoch):
                 continue
 
             # Forward
-            preds = model(images)  # 3 x [B, A, H, W, no]
+            loss = model(images, targets)  # 3 x [B, A, H, W, no]
 
-            val_loss, (lbox, lobj, lcls) = model.compute_loss(
-                preds, targets, images.shape[2:]
-            )
-
+            val_loss = loss["loss"]
             total_val_loss += val_loss.item()
 
             pbar.set_postfix({"loss": f"{val_loss.item():.4f}"})
