@@ -76,32 +76,31 @@ class DetrWrapper(BaseDetectionModel):
 
         print(f"✅ Updated model to {num_classes} classes")
 
-    def forward(self, images: torch.Tensor, targets=None) -> dict:
+    def _forward_train(self, images: torch.Tensor, targets=None) -> dict:
         """
         Unified DETR forward pass that uses DETR's internal loss during training.
         """
 
-        if self.training:
-            if targets is None:
-                raise ValueError("targets must be provided during training")
+        if targets is None:
+            raise ValueError("targets must be provided during training")
 
-            # HF DETR requires named arguments
-            outputs = self.model(pixel_values=images, labels=targets)
+        # HF DETR requires named arguments
+        outputs = self.model(pixel_values=images, labels=targets)
 
-            # HF DETR returns a dict-like object containing loss and loss components
-            total_loss = outputs.loss
-            loss_dict = outputs.loss_dict
+        # HF DETR returns a dict-like object containing loss and loss components
+        total_loss = outputs.loss
+        loss_dict = outputs.loss_dict
 
-            return {
-                "loss": total_loss,
-                # "loss_dict": loss_dict, -> optional detailed losses
-            }
+        return {
+            "loss": total_loss,
+            # "loss_dict": loss_dict, -> optional detailed losses
+        }
 
-        else:
-            # Evaluation mode returns predictions
-            outputs = self.model(images)
-            predictions = (outputs["logits"], outputs["pred_boxes"])
+    def _forward_eval(self, images: torch.Tensor) -> Dict[str, Any]:
+        # Evaluation mode returns predictions
+        outputs = self.model(images)
+        predictions = (outputs["logits"], outputs["pred_boxes"])
 
-            return {
-                "predictions": predictions,
-            }
+        return {
+            "predictions": predictions,
+        }

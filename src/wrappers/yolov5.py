@@ -102,7 +102,7 @@ class YOLOv5Wrapper(BaseDetectionModel):
 
         print(f"✅ Updated model to {num_classes} classes")
 
-    def forward(self, images: torch.Tensor, targets) -> dict:
+    def _forward_train(self, images: torch.Tensor, targets) -> dict:
         """
         Forward pass — returns raw model predictions and computed loss.
 
@@ -133,15 +133,24 @@ class YOLOv5Wrapper(BaseDetectionModel):
               is returned under 'loss'.
         """
         pred = self.model(images)
+        loss, _ = self.compute_loss(pred, targets, images.shape[2:])
 
-        if self.training:
-            loss, _ = self.compute_loss(pred, targets, images.shape[2:])
+        return {
+            "loss": loss,
+        }
 
-            return {
-                "loss": loss,
-            }
+    def _forward_eval(self, images: torch.Tensor) -> dict:
+        """
+        Forward pass for evaluation — returns processed predictions.
 
-        return {"predictions": pred}
+        Args:
+            images (torch.Tensor): Batch of input images, shape [B, 3, H, W].
+        """
+        pred = self.model(images)
+
+        return {
+            "predictions": pred,
+        }
 
     def compute_loss(
         self,

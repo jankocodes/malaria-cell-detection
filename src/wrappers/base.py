@@ -16,7 +16,6 @@ class BaseDetectionModel(ABC, nn.Module):
         self.train()
         self._set_num_classes(num_classes)
 
-    @abstractmethod
     def forward(
         self,
         images: torch.Tensor,
@@ -34,7 +33,12 @@ class BaseDetectionModel(ABC, nn.Module):
             During training: Dict with losses {'loss': total_loss, 'box_loss': ..., 'cls_loss': ...}
             During inference: Dict with predictions {'boxes': ..., 'scores': ..., 'labels': ...}
         """
-        pass
+        if self.training:
+            if targets is None:
+                raise ValueError("Targets must be provided in training mode.")
+            return self._forward_train(images, targets)
+        else:
+            return self._forward_eval(images)
 
     @abstractmethod
     def _set_num_classes(self, num_classes: int):

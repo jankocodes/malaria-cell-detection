@@ -90,39 +90,58 @@ class RetinaNetWrapper(BaseDetectionModel):
 
         print(f"✅ Updated model to {num_classes} classes")
 
-    def forward(self, images: torch.Tensor, targets=None) -> Dict[str, Any]:
+    def _forward_eval(self, images: torch.Tensor) -> Dict[str, List[torch.Tensor]]:
         """
-        Forward pass through RetinaNet.
+        Forward pass for evaluation — returns processed predictions.
 
-        Returns a dict with:
-            - 'loss': dict of losses (empty during eval)
-            - 'predictions': list of detection dicts (always available)
+        Args:
+            images (torch.Tensor): Batch of input images, shape [B, 3, H, W].
         """
-        # Convert target boxes to xyxy format if targets are provided
-        coco_targets = (
-            self._convert_targets_xyxy(targets) if targets is not None else None
-        )
+        outputs = self.model(images)  # List of dicts per image
 
-        # Run the model
-        outputs = self.model(
-            images, coco_targets
-        )  # returns losses if training, detections if eval
+        batch_boxes = []
+        batch_scores = []
+        batch_labels = []
 
-        # Initialize return dict
-        result = {}
+        for output in outputs:
+            boxes = output["boxes"]  # (N, 4)
+            scores = output["scores"]  # (N,)
+            labels = output["labels"]  # (N,)
 
-        if self.model.training:
-            # outputs is a dict of losses during training
-            cls_loss = outputs["classification"]
-            box_loss = outputs["bbox_regression"]
-            total_loss = cls_loss + box_loss
-            result["loss"] = total_loss
+            batch_boxes.append(boxes)
+            batch_scores.append(scores)
+            batch_labels.append(labels)
 
-        else:
-            # During eval, outputs are the predictions
-            result["predictions"] = outputs
+        # return {
+        #     "boxes": batch_boxes,
+        #     "scores": batch_scores,
+        #     "labels": batch_labels,
+        # }
 
-        return result
+        return {
+            "predictions": outputs,
+        }
+
+    def _forward_train(self, images: torch.Tensor, targets) -> Dict[str, torch.Tensor]:
+        """
+        Training forward pass.
+
+        Note: RetinaNet expects targets in COCO format [x1, y1, x2, y2].
+        This method converts the standard format to COCO format.
+        """
+        # Convert target boxes to xyxy format
+        coco_targets = self._convert_targets_xyxy(targets)
+
+        # Forward pass through the model
+        outputs = self.model(images, coco_targets)  # returns losses
+
+        cls_loss = outputs["classification"]
+        box_loss = outputs["bbox_regression"]
+        total_loss = cls_loss + box_loss
+
+        return {
+            "loss": total_loss,
+        }
 
     # --- New function ---
     def _convert_targets_xyxy(
