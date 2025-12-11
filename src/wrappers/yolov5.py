@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple
 from .base import BaseDetectionModel
+from yolov5.models.yolo import DetectionModel
 
 
 class YOLOv5Wrapper(BaseDetectionModel):
@@ -32,9 +33,9 @@ class YOLOv5Wrapper(BaseDetectionModel):
 
     def __init__(
         self,
-        model: nn.Module,
+        model: DetectionModel,
         num_classes: int,
-        device,
+        device: str,
         loss_fn: Optional[callable] = None,
     ):
         super().__init__(
@@ -53,7 +54,7 @@ class YOLOv5Wrapper(BaseDetectionModel):
         try:
             from yolov5.utils.loss import ComputeLoss
 
-            self.loss_fn = ComputeLoss(self.model.model)
+            self.loss_fn = ComputeLoss(self.model)
         except ImportError:
             print("Warning: Could not import YOLOv5 loss. Set loss_fn manually.")
             self.loss_fn = None
@@ -79,7 +80,7 @@ class YOLOv5Wrapper(BaseDetectionModel):
         self.model.names = [f"class_{i}" for i in range(num_classes)]
 
         # Get the Detect layer (last layer in YOLOv5)
-        detect_layer = self.model.model.model[-1]
+        detect_layer = self.model.model[-1]
 
         # Update detection layer class count
         detect_layer.nc = num_classes

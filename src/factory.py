@@ -1,4 +1,4 @@
-import sys
+import yaml
 from pathlib import Path
 
 # Import all necessary libraries for the models
@@ -78,29 +78,36 @@ class ModelFactory:
         model_name: str = "yolov5s",
         weight_path: str = "models/yolov5",
         num_classes: int = 7,
+        loss_yaml: str = "loss.yaml",
     ) -> YOLOv5Wrapper:
 
-        model = torch.hub.load(
-            repo_path,
-            "custom",
-            autoshape=False,
-            path=f"{weight_path}/{model_name}.pt",
-        )
+        if pretrained:
+            wrapper = torch.hub.load(
+                repo_path,
+                "custom",
+                autoshape=False,
+                path=f"{weight_path}/{model_name}.pt",
+            )
+            model = wrapper.model
+        else:
+            model = torch.hub.load(
+                repo_path,
+                model_name,
+                pretrained=False,
+                autoshape=False,
+                force_reload=True,
+            )
 
-        if not pretrained:
-            print("⚠ Resetting all YOLOv5 model weights to random initialization...")
-            model.model.apply(self._reset_weights)
+        # load hyperparameters
+        with open(Path(weight_path) / loss_yaml) as f:
+            hyp = yaml.safe_load(f)
+            model.hyp = hyp
 
         return YOLOv5Wrapper(
             model=model,
             num_classes=num_classes,
             device=self.device,
         )
-
-    def _reset_weights(self, m):
-        """Reset weights of Conv, BN, Linear, etc."""
-        if hasattr(m, "reset_parameters"):
-            m.reset_parameters()
 
     def load_retinanet_pipeline(
         self,
