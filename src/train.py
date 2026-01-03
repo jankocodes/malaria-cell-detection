@@ -6,10 +6,10 @@ from torch.utils.data import DataLoader
 from yolov5.utils.loss import ComputeLoss
 from od_utils.training import train_one_epoch
 from od_utils.data import collate_fn
-
+from factory import ModelType
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-NUM_EPOCHS = 1
+NUM_EPOCHS = 3
 BATCH_SIZE = 32
 LEARNING_RATE = 0.001
 DATASET_PATH = "data/raw/vogelbacher23/dataset_segmentation"
@@ -18,7 +18,8 @@ DATASET_PATH = "data/raw/vogelbacher23/dataset_segmentation"
 if __name__ == "__main__":
 
     # --- Load Model ---
-    model = ModelFactory(device=DEVICE).load_yolo_v5(pretrained=True)
+    factory = ModelFactory(device=DEVICE, num_classes=7)
+    model = factory.load(model_type=ModelType.YOLOV5, pretrained=True)
 
     # --- Load Data ---
     train_dataset = BloodCellDataset(

@@ -15,25 +15,57 @@ from wrappers.yolov5 import YOLOv5Wrapper
 from wrappers.retinanet import RetinaNetWrapper
 from wrappers.detr import DetrWrapper
 from wrappers.yolov8 import YOLOv8Wrapper
+from typing import Literal, Any
+
+from enum import Enum
+
+
+class ModelType(str, Enum):
+    YOLOV8 = "yolov8"
+    YOLOV5 = "yolov5"
+    RETINANET = "retinanet"
+    DETR = "detr"
 
 
 class ModelFactory:
     """
-    Factory class for loading and initializing various object detection models.
+    Factory class for loading and initializing object detection models.
 
-    This factory provides methods to load different state-of-the-art object detection
-    models including YOLOv8, YOLOv5, RetinaNet, and DETR. Each model is wrapped with
-    a corresponding wrapper class that provides a unified interface.
+    Supports loading pretrained or custom-trained models from four architectures:
+    - YOLOv8
+    - YOLOv5
+    - RetinaNet
+    - DETR
+
+    Each model is wrapped in a corresponding wrapper class that provides a unified interface.
 
     Attributes:
-        device (str): The device to load models on ('cuda' or 'cpu').
-        num_classes (int): Number of object classes for detection tasks.
+        device (str): The computing device ('cuda' or 'cpu'). Defaults to 'cuda' if available.
+        num_classes (int): Number of object detection classes. Defaults to 7.
 
-    Methods:
-        load_yolo_v8: Load a YOLOv8 model with optional pretrained weights.
-        load_yolo_v5: Load a YOLOv5 model from torch hub with optional pretrained weights.
-        load_retinanet_pipeline: Load a RetinaNet model with ResNet50 FPN backbone and optional pretrained weights.
-        load_detr_pipeline: Load a DETR (Detection Transformer) model from Hugging Face with optional pretrained weights.
+    Example:
+        >>> factory = ModelFactory(num_classes=7, device='cuda')
+        >>> model = factory.load(ModelType.YOLOV8, model_name='yolov8s')
+        >>> predictions = model.predict(image)
+    """ """
+    Factory class for loading and initializing object detection models.
+    
+    Supports loading pretrained or custom-trained models from four architectures:
+    - YOLOv8
+    - YOLOv5
+    - RetinaNet
+    - DETR
+    
+    Each model is wrapped in a corresponding wrapper class that provides a unified interface.
+    
+    Attributes:
+        device (str): The computing device ('cuda' or 'cpu'). Defaults to 'cuda' if available.
+        num_classes (int): Number of object detection classes. Defaults to 7.
+    
+    Example:
+        >>> factory = ModelFactory(num_classes=7, device='cuda')
+        >>> model = factory.load(ModelType.YOLOV8, model_name='yolov8s')
+        >>> predictions = model.predict(image)
     """
 
     def __init__(
@@ -45,6 +77,31 @@ class ModelFactory:
         self.num_classes = num_classes
 
         print(f"Model factory initialized. Using device: {self.device}")
+
+    def load(
+        self,
+        model_type: ModelType,
+        **kwargs: Any,
+    ):
+        """
+        Load a model by type using the corresponding factory method.
+        """
+
+        if model_type == ModelType.YOLOV8:
+            return self.load_yolo_v8(**kwargs)
+
+        elif model_type == ModelType.YOLOV5:
+            return self.load_yolo_v5(**kwargs)
+
+        elif model_type == ModelType.RETINANET:
+            return self.load_retinanet_pipeline(**kwargs)
+
+        elif model_type == ModelType.DETR:
+            return self.load_detr_pipeline(**kwargs)
+
+        else:
+            # This should never happen, but is nice for defensive programming
+            raise NotImplementedError(f"Model type {model_type} not implemented.")
 
     def load_yolo_v8(
         self,
