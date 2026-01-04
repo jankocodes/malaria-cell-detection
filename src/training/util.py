@@ -1,6 +1,5 @@
 import torch
 from tqdm import tqdm
-from od_utils.data import format_batch_targets
 
 
 def train_one_epoch(model, train_loader, val_loader, optimizer, epoch):

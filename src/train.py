@@ -3,56 +3,60 @@ from tqdm import tqdm
 from factory import ModelFactory
 from data.dataset import BloodCellDataset
 from torch.utils.data import DataLoader
-from yolov5.utils.loss import ComputeLoss
-from od_utils.training import train_one_epoch
-from od_utils.data import collate_fn
+from training.util import train_one_epoch
+from data.util import collate_fn
 from factory import ModelType
-
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-NUM_EPOCHS = 3
-BATCH_SIZE = 32
-LEARNING_RATE = 0.001
-DATASET_PATH = "data/raw/vogelbacher23/dataset_segmentation"
+import argparse
+import yaml
 
 
-if __name__ == "__main__":
+def main(cfg):
+
+    hyp = cfg["hyp"]
+    model_cfg = cfg["model"]
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
 
     # --- Load Model ---
-    factory = ModelFactory(device=DEVICE, num_classes=7)
-    model = factory.load(model_type=ModelType.YOLOV5, pretrained=True)
+    factory = ModelFactory(device=device, num_classes=model_cfg["num_classes"])
+    model = factory.load(
+        model_type=ModelType(model_cfg["type"]),
+        pretrained=model_cfg["pretrained"],
+    )
 
     # --- Load Data ---
     train_dataset = BloodCellDataset(
-        annotations_file=f"{DATASET_PATH}/train.json",
-        img_dir=f"{DATASET_PATH}/train",
+        annotations_file=f"{cfg['data_path']}/train.json",
+        img_dir=f"{cfg['data_path']}/train",
     )
 
     val_dataset = BloodCellDataset(
-        annotations_file=f"{DATASET_PATH}/val.json",
-        img_dir=f"{DATASET_PATH}/val",
+        annotations_file=f"{cfg['data_path']}/val.json",
+        img_dir=f"{cfg['data_path']}/val",
     )
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size=BATCH_SIZE,
+        batch_size=hyp["batch_size"],
         shuffle=True,
-        num_workers=0,
+        num_workers=hyp["num_workers"],
         collate_fn=collate_fn,
     )
 
     val_loader = DataLoader(
         val_dataset,
-        batch_size=BATCH_SIZE,
+        batch_size=hyp["batch_size"],
         shuffle=False,
-        num_workers=0,
+        num_workers=hyp["num_workers"],
         collate_fn=collate_fn,
     )
 
     # --- Optimizer ---
-    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=hyp["learning_rate"])
 
     # --- Training Loop ---
-    for epoch in range(NUM_EPOCHS):
+    for epoch in range(hyp["num_epochs"]):
         result = train_one_epoch(
             model=model,
             train_loader=train_loader,
@@ -61,3 +65,14 @@ if __name__ == "__main__":
             epoch=epoch,
         )
         print(result)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", required=True)
+    args = parser.parse_args()
+
+    with open(args.config, "r") as f:
+        cfg = yaml.safe_load(f)
+
+    main(cfg)

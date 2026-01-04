@@ -9,3 +9,8 @@ runs
 .DS_Store
 *.pt
 *.png
+*.jpg
+*.ipynb
+__pycache__/
+.vscode/
+slurm/
