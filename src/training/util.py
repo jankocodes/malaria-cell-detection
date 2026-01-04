@@ -2,14 +2,18 @@ import torch
 from tqdm import tqdm
 
 
-def train_one_epoch(model, train_loader, val_loader, optimizer, epoch):
+def train_one_epoch(
+    model, train_loader, val_loader, optimizer, epoch, show_progress=True
+):
     device = model.device
 
     # --- Training ---
     model.train()
     total_train_loss = 0
 
-    pbar = tqdm(train_loader, desc=f"Training - Epoch {epoch +1}")
+    pbar = tqdm(
+        train_loader, desc=f"Training - Epoch {epoch +1}", disable=not show_progress
+    )
 
     for images, targets in pbar:
         images = images.float().to(device)
@@ -34,7 +38,9 @@ def train_one_epoch(model, train_loader, val_loader, optimizer, epoch):
     with torch.no_grad():
         total_val_loss = 0
 
-        pbar = tqdm(val_loader, desc=f"Validation - Epoch {epoch +1}")
+        pbar = tqdm(
+            val_loader, desc=f"Validation - Epoch {epoch +1}", disable=not show_progress
+        )
 
         # validation
         for images, targets in pbar:

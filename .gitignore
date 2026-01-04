@@ -14,3 +14,6 @@ runs
 __pycache__/
 .vscode/
 slurm/
+.cache/
+.matplotlib/
+*locally.py

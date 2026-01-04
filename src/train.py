@@ -1,5 +1,4 @@
 import torch
-from tqdm import tqdm
 from factory import ModelFactory
 from data.dataset import BloodCellDataset
 from torch.utils.data import DataLoader
@@ -26,6 +25,7 @@ def main(cfg):
     )
 
     # --- Load Data ---
+    print("Loading datasets...")
     train_dataset = BloodCellDataset(
         annotations_file=f"{cfg['data_path']}/train.json",
         img_dir=f"{cfg['data_path']}/train",
@@ -56,6 +56,7 @@ def main(cfg):
     optimizer = torch.optim.AdamW(model.parameters(), lr=hyp["learning_rate"])
 
     # --- Training Loop ---
+    print("Starting training...")
     for epoch in range(hyp["num_epochs"]):
         result = train_one_epoch(
             model=model,
@@ -63,6 +64,7 @@ def main(cfg):
             val_loader=val_loader,
             optimizer=optimizer,
             epoch=epoch,
+            show_progress=cfg["show_progress"],
         )
         print(result)
 
