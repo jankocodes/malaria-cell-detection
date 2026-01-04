@@ -9,7 +9,7 @@ import argparse
 import yaml
 
 
-def main(cfg):
+def main(cfg, data_path=None, show_progress=True):
 
     hyp = cfg["hyp"]
     model_cfg = cfg["model"]
@@ -27,13 +27,13 @@ def main(cfg):
     # --- Load Data ---
     print("Loading datasets...")
     train_dataset = BloodCellDataset(
-        annotations_file=f"{cfg['data_path']}/train.json",
-        img_dir=f"{cfg['data_path']}/train",
+        annotations_file=f"{data_path}/train.json",
+        img_dir=f"{data_path}/train",
     )
 
     val_dataset = BloodCellDataset(
-        annotations_file=f"{cfg['data_path']}/val.json",
-        img_dir=f"{cfg['data_path']}/val",
+        annotations_file=f"{data_path}/val.json",
+        img_dir=f"{data_path}/val",
     )
 
     train_loader = DataLoader(
@@ -64,17 +64,22 @@ def main(cfg):
             val_loader=val_loader,
             optimizer=optimizer,
             epoch=epoch,
-            show_progress=cfg["show_progress"],
+            show_progress=show_progress,
         )
         print(result)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", required=True)
+    parser.add_argument("--config", required=True, type=str, help="Path to config file")
+    parser.add_argument("--data_path", type=str, help="Override dataset path")
+    parser.add_argument(
+        "--show_progress", type=bool, default=True, help="Override progress flag"
+    )
+
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
         cfg = yaml.safe_load(f)
 
-    main(cfg)
+    main(cfg, data_path=args.data_path, show_progress=args.show_progress)
