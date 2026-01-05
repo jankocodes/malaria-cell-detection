@@ -9,10 +9,11 @@ import argparse
 import yaml
 
 
-def main(cfg, data_path=None, show_progress=True):
+def main(cfg, data_path=None, show_progress=True, model_dir=None):
 
     hyp = cfg["hyp"]
     model_cfg = cfg["model"]
+    data_path = data_path if data_path is not None else cfg["data_path"]
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
@@ -22,6 +23,7 @@ def main(cfg, data_path=None, show_progress=True):
     model = factory.load(
         model_type=ModelType(model_cfg["type"]),
         pretrained=model_cfg["pretrained"],
+        model_dir=model_dir,
     )
 
     # --- Load Data ---
@@ -76,10 +78,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--show_progress", type=bool, default=True, help="Override progress flag"
     )
+    parser.add_argument("--model_dir", type=str, help="Override model directory path")
 
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
         cfg = yaml.safe_load(f)
 
-    main(cfg, data_path=args.data_path, show_progress=args.show_progress)
+    main(
+        cfg,
+        data_path=args.data_path,
+        show_progress=args.show_progress,
+        model_dir=args.model_dir,
+    )

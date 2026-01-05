@@ -81,6 +81,7 @@ class ModelFactory:
     def load(
         self,
         model_type: ModelType,
+        model_dir: str = None,
         **kwargs: Any,
     ):
         """
@@ -88,10 +89,16 @@ class ModelFactory:
         """
 
         if model_type == ModelType.YOLOV8:
-            return self.load_yolo_v8(**kwargs)
+            return self.load_yolo_v8(
+                model_dir=model_dir if model_dir is not None else "models/yolov8",
+                **kwargs,
+            )
 
         elif model_type == ModelType.YOLOV5:
-            return self.load_yolo_v5(**kwargs)
+            return self.load_yolo_v5(
+                model_dir=model_dir if model_dir is not None else "models/yolov5",
+                **kwargs,
+            )
 
         elif model_type == ModelType.RETINANET:
             return self.load_retinanet_pipeline(**kwargs)
@@ -163,7 +170,7 @@ class ModelFactory:
         repo_path: str = "ultralytics/yolov5",
         pretrained: bool = True,
         model_name: str = "yolov5s",
-        weight_path: str = "models/yolov5",
+        model_dir: str = "models/yolov5",
         loss_yaml: str = "loss.yaml",
     ) -> YOLOv5Wrapper:
 
@@ -172,7 +179,7 @@ class ModelFactory:
                 repo_path,
                 "custom",
                 autoshape=False,
-                path=f"{weight_path}/{model_name}.pt",
+                path=f"{model_dir}/{model_name}.pt",
             )
             model = wrapper.model
         else:
@@ -185,7 +192,7 @@ class ModelFactory:
             )
 
         # load hyperparameters
-        with open(Path(weight_path) / loss_yaml) as f:
+        with open(Path(model_dir) / loss_yaml) as f:
             hyp = yaml.safe_load(f)
             model.hyp = hyp
 
