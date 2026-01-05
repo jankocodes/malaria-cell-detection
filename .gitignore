@@ -2,7 +2,7 @@ docs
 data/*
 notesw
 *test.py
-models/*/*
+
 runs
 .idea
 *.pyc
