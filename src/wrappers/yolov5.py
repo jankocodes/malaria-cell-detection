@@ -91,7 +91,7 @@ class YOLOv5Wrapper(BaseDetectionModel):
             [
                 nn.Conv2d(
                     x.in_channels, detect_layer.no * len(detect_layer.anchors[i]), 1
-                )
+                ).to(self.device)
                 for i, x in enumerate(detect_layer.m)
             ]
         )
@@ -216,7 +216,10 @@ class YOLOv5Wrapper(BaseDetectionModel):
             img_idx = torch.full((len(labels), 1), i)
 
             xywh = xyxy_to_xywh_norm(boxes, img_size, self.device)
-            merged = torch.cat([img_idx, labels.to(device), xywh.to(device)], dim=1)
+            merged = torch.cat(
+                [img_idx.to(self.device), labels.to(self.device), xywh.to(self.device)],
+                dim=1,
+            )
 
             formatted.append(merged)
 

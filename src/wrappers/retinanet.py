@@ -77,7 +77,7 @@ class RetinaNetWrapper(BaseDetectionModel):
         )
 
         # Replace the layer
-        self.model.head.classification_head.cls_logits = new_cls
+        self.model.head.classification_head.cls_logits = new_cls.to(self.device)
         self.model.head.classification_head.num_classes = num_classes
 
         # Init weights like torchvision
@@ -125,25 +125,28 @@ class RetinaNetWrapper(BaseDetectionModel):
     def _forward_train(self, images: torch.Tensor, targets) -> Dict[str, torch.Tensor]:
         """
         Training forward pass.
-
-        Note: RetinaNet expects targets in COCO format [x1, y1, x2, y2].
-        This method converts the standard format to COCO format.
         """
         # Convert target boxes to xyxy format
         coco_targets = self._convert_targets_xyxy(targets)
 
-        # Forward pass through the model
+        # Forward pass
         outputs = self.model(images, coco_targets)  # returns losses
 
-        cls_loss = outputs["classification"]
-        box_loss = outputs["bbox_regression"]
+        for k, v in outputs.items():
+            if isinstance(v, torch.Tensor):
+                print(
+                    f"[DEBUG][_forward_train] output '{k}' device: {v.device}, dtype: {v.dtype}"
+                )
+
+        # Assuming your outputs dict contains classification and bbox_regression
+        cls_loss = outputs.get("classification", outputs.get("loss_classifier"))
+        box_loss = outputs.get("bbox_regression", outputs.get("loss_box_reg"))
         total_loss = cls_loss + box_loss
 
         return {
             "loss": total_loss,
         }
 
-    # --- New function ---
     def _convert_targets_xyxy(
         self, targets: List[Dict[str, torch.Tensor]]
     ) -> List[Dict[str, torch.Tensor]]:

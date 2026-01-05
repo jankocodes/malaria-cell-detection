@@ -6,6 +6,7 @@ def train_one_epoch(
     model, train_loader, val_loader, optimizer, epoch, show_progress=True
 ):
     device = model.device
+    print(f"[DEBUG] Model device: {device}")
 
     # --- Training ---
     model.train()
@@ -15,14 +16,23 @@ def train_one_epoch(
         train_loader, desc=f"Training - Epoch {epoch +1}", disable=not show_progress
     )
 
-    for images, targets in pbar:
+    for batch_idx, (images, targets) in enumerate(pbar):
         images = images.float().to(device)
 
         if len(targets) == 0:
             continue
 
+        # Ensure targets are also on the right device
+        coco_targets = [
+            {
+                k: v.to(device) if isinstance(v, torch.Tensor) else v
+                for k, v in t.items()
+            }
+            for t in targets
+        ]
+
         # Forward
-        result = model(images, targets)  # 3 x [B, A, H, W, no]
+        result = model(images, coco_targets)  # 3 x [B, A, H, W, no]
 
         train_loss = result["loss"]
 
@@ -34,7 +44,7 @@ def train_one_epoch(
 
         pbar.set_postfix({"loss": f"{train_loss.item():.4f}"})
 
-    # --- Training ---
+    # --- Validation ---
     with torch.no_grad():
         total_val_loss = 0
 
@@ -43,14 +53,22 @@ def train_one_epoch(
         )
 
         # validation
-        for images, targets in pbar:
+        for batch_idx, (images, targets) in enumerate(pbar):
             images = images.float().to(device)
 
             if len(targets) == 0:
                 continue
 
+            coco_targets = [
+                {
+                    k: v.to(device) if isinstance(v, torch.Tensor) else v
+                    for k, v in t.items()
+                }
+                for t in targets
+            ]
+
             # Forward
-            loss = model(images, targets)  # 3 x [B, A, H, W, no]
+            loss = model(images, coco_targets)  # 3 x [B, A, H, W, no]
 
             val_loss = loss["loss"]
             total_val_loss += val_loss.item()

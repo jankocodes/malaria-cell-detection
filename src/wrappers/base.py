@@ -12,7 +12,7 @@ class BaseDetectionModel(ABC, nn.Module):
         self.model = model
         self.num_classes = num_classes
         self.device = device
-        self.model.to(self.device)
+        self.to(self.device)
 
         self.train()
         self._set_num_classes(num_classes)
