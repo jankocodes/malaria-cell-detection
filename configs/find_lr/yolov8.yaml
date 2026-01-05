@@ -1,0 +1,13 @@
+hyp:
+  batch_size: 32
+  min_lr: 0.00001
+  max_lr: 0.1
+  num_workers: 0
+
+model:
+  type: yolov8 # yolov8 | yolov5 | retinanet | detr
+  pretrained: true
+  num_classes: 7
+
+data_path: data/raw/vogelbacher23
+show_progress: true
