@@ -1,8 +1,5 @@
 import torch
 from torch.utils.data import DataLoader
-from factory import ModelFactory
-from data.dataset import BloodCellDataset
-from data.util import collate_fn
 from ignite.engine import Engine
 from ignite.handlers import FastaiLRFinder
 from ignite.contrib.handlers import ProgressBar
@@ -22,11 +19,23 @@ def find_lr(
     # ---------------------------------------------------------
     def step_fn(engine, batch):
         model.train()
+        device = model.device
 
         images, targets = batch
 
+        images = images.float().to(device)
+
+        # Ensure targets are also on the right device
+        coco_targets = [
+            {
+                k: v.to(device) if isinstance(v, torch.Tensor) else v
+                for k, v in t.items()
+            }
+            for t in targets
+        ]
+
         # Forward pass — YOLOv5Wrapper returns dict {"loss": tensor, ...}
-        out = model(images, targets)
+        out = model(images, coco_targets)
         loss = out["loss"]
 
         optimizer.zero_grad()
