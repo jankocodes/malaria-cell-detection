@@ -79,4 +79,8 @@ def train_one_epoch(
     result["train_loss"] = total_train_loss / len(train_loader)
     result["val_loss"] = total_val_loss / len(val_loader)
 
+    print(
+        f"[Epoch {epoch + 1}] Train Loss: {result['train_loss']:.4f}, Val Loss: {result['val_loss']:.4f}"
+    )
+
     return result
