@@ -27,6 +27,11 @@ class YOLOv8Wrapper(BaseDetectionModel):
         loss_fn: Optional[callable] = None,
     ):
         super().__init__(model=model, num_classes=num_classes, device=device)
+
+        # Enable gradients for all parameters (they may be frozen when loaded from YOLO)
+        for param in self.model.parameters():
+            param.requires_grad = True
+
         self.loss_fn = loss_fn
         if self.loss_fn is None:
             self._init_default_loss()
@@ -36,15 +41,18 @@ class YOLOv8Wrapper(BaseDetectionModel):
         try:
             from ultralytics.utils.loss import v8DetectionLoss
 
-            self.loss_fn = v8DetectionLoss(self.model)
-
+            # YOLOv8 loss expects model.args to be an object with .box, .cls, .dfl attributes
             class HParams:
-                def __init__(self, box=0.05, cls=0.5, dfl=1.5):
+                def __init__(self, box=7.5, cls=0.5, dfl=1.5):
                     self.box = box
                     self.cls = cls
                     self.dfl = dfl
 
-            self.loss_fn.hyp = HParams()
+            # Replace model.args with HParams object
+            # (when loading from YOLO wrapper, model.args is a dict which doesn't work)
+            self.model.args = HParams()
+
+            self.loss_fn = v8DetectionLoss(self.model)
         except ImportError:
             print("Warning: Could not import YOLOv8 loss. Set loss_fn manually.")
             self.loss_fn = None
@@ -69,15 +77,7 @@ class YOLOv8Wrapper(BaseDetectionModel):
         # Shape of each: [batch, num_anchors, grid_h, grid_w, 4+nc]
         pred = self.model(images)
 
-        total_loss, loss_items = self.compute_loss(pred, targets)
-
-        if total_loss.ndim > 0:
-            total_loss = total_loss.sum()
-
-        # ensure requires_grad
-        total_loss = total_loss.to(self.device)
-        if not total_loss.requires_grad:
-            total_loss = total_loss.clone().detach().requires_grad_(True)
+        total_loss, loss_items = self.compute_loss(pred, targets, images.shape[2:])
 
         return {"loss": total_loss, "loss_items": loss_items}
 
@@ -98,45 +98,50 @@ class YOLOv8Wrapper(BaseDetectionModel):
         self,
         predictions: Tuple[torch.Tensor, ...],
         targets: List[Dict[str, torch.Tensor]],
-    ) -> Dict[str, torch.Tensor]:
+        img_size: Tuple[int, int],
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Compute YOLOv5 loss separately from forward pass.
+        Compute YOLOv8 loss separately from forward pass.
 
         Args:
             predictions: Output from forward() - tuple of prediction tensors
             targets: List of target dicts with:
-                - 'boxes': [N, 4] in format [x1, y1, x2, y2] (normalized 0-1)
-                - 'labels': [N] class indices
+                - 'boxes': [N, 4] in format [x, y, w, h] (COCO format, pixel coords)
+                - 'class_labels': [N] class indices
+            img_size: (height, width) of input images
 
         Returns:
-            Dict with losses: {'total_loss', 'box_loss', 'obj_loss', 'cls_loss'}
+            Tuple of (total_loss, loss_items)
         """
         if self.loss_fn is None:
             raise ValueError("Loss function not initialized. Set loss_fn in __init__")
 
-        formatted_preds, batch_dict = self.prepare_v8_loss_inputs(predictions, targets)
-        # Compute loss using YOLOv5's loss function
+        formatted_preds, batch_dict = self.prepare_v8_loss_inputs(
+            predictions, targets, img_size
+        )
+        # Compute loss using YOLOv8's loss function
+        # Returns: loss tensor with [box_loss, cls_loss, dfl_loss] and detached loss_items
         loss, loss_items = self.loss_fn(formatted_preds, batch_dict)
 
-        # Return structured loss dict
-        return loss, loss_items
+        # Sum the loss components to get scalar loss for backpropagation
+        total_loss = loss.sum()
 
-    def prepare_v8_loss_inputs(self, preds, targets):
+        return total_loss, loss_items
+
+    def prepare_v8_loss_inputs(self, preds, targets, img_size):
         """
         Convert YOLOv8 predictions and target annotations to the format expected by v8DetectionLoss.
 
         Args:
             preds (list[Tensor] or tuple): List of feature maps from the model or (None, feats)
                 Each feature map: (B, nc + 4*reg_max, H, W)
-            targets (list[dict] or Tensor): Ground truth for each image in the batch.
-                If list of dict: each dict = {"boxes": (N,4), "labels": (N,)}
-            batch_size (int): Number of images in the batch
-            nc (int): Number of classes
-            reg_max (int): DFL reg_max from the model
+            targets (list[dict]): Ground truth for each image in the batch.
+                Each dict = {"boxes": (N,4) in [x, y, w, h] COCO format (pixels), "class_labels": (N,)}
+            img_size (tuple): (height, width) of input images
 
         Returns:
             formatted_preds: list of feature maps as expected by v8DetectionLoss
-            batch_dict: dict with keys "batch_idx", "cls", "bboxes"
+            batch_dict: dict with keys "batch_idx", "cls", "bboxes" (normalized xywh)
         """
 
         # ---- 1. Ensure preds is a list ----
@@ -155,9 +160,11 @@ class YOLOv8Wrapper(BaseDetectionModel):
         cls_list = []
         bbox_list = []
 
+        h, w = img_size
+
         for b_idx, t in enumerate(targets):
             if isinstance(t, dict):
-                boxes = t["boxes"]
+                boxes = t["boxes"]  # [N, 4] in COCO format [x, y, w, h] pixels
                 labels = t["class_labels"]
             else:
                 # assume already tensor of shape (N,5) [cls, xyxy] or (N,6) [idx, cls, xyxy]
@@ -167,6 +174,13 @@ class YOLOv8Wrapper(BaseDetectionModel):
             num_targets = boxes.shape[0]
             if num_targets == 0:
                 continue
+
+            # Convert COCO format [x, y, w, h] (pixels) to normalized [x_center, y_center, w, h]
+            boxes = boxes.clone()
+            boxes[:, 0] = (boxes[:, 0] + boxes[:, 2] / 2) / w  # x_center normalized
+            boxes[:, 1] = (boxes[:, 1] + boxes[:, 3] / 2) / h  # y_center normalized
+            boxes[:, 2] = boxes[:, 2] / w  # width normalized
+            boxes[:, 3] = boxes[:, 3] / h  # height normalized
 
             batch_idx_list.append(
                 torch.full((num_targets,), b_idx, dtype=torch.long, device=boxes.device)
@@ -179,9 +193,9 @@ class YOLOv8Wrapper(BaseDetectionModel):
             cls = torch.cat(cls_list, dim=0)
             bboxes = torch.cat(bbox_list, dim=0)
         else:
-            batch_idx = torch.tensor([], dtype=torch.long)
-            cls = torch.tensor([], dtype=torch.long)
-            bboxes = torch.tensor([], dtype=torch.float32).view(0, 4)
+            batch_idx = torch.tensor([], dtype=torch.long, device=self.device)
+            cls = torch.tensor([], dtype=torch.long, device=self.device)
+            bboxes = torch.tensor([], dtype=torch.float32, device=self.device).view(0, 4)
 
         batch_dict = {"batch_idx": batch_idx, "cls": cls, "bboxes": bboxes}
 
