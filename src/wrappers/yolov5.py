@@ -192,18 +192,33 @@ class YOLOv5Wrapper(BaseDetectionModel):
         Converts target annotations from a list of dictionaries containing boxes and labels
         into a single tensor where each row represents an object with its metadata.
 
+        Args:
+            targets: List of dicts with:
+                - 'boxes': [N, 4] in COCO format [x, y, w, h] (pixels)
+                - 'class_labels': [N] class indices
+            img_size: (height, width) tuple
+            device: target device
+
+        Returns:
+            Tensor of shape [total_objects, 6] with format [batch_idx, class, cx, cy, w, h]
+            where cx, cy, w, h are normalized to [0, 1]
         """
 
-        def xyxy_to_xywh_norm(boxes, img_shape_hw, device):
-            """Convert xyxy boxes to normalized xywh"""
+        def coco_to_xywh_norm(boxes, img_shape_hw, device):
+            """Convert COCO [x, y, w, h] pixels to normalized [cx, cy, w, h]"""
             h, w = img_shape_hw
-            boxes = boxes.to(device)
-            x1, y1, x2, y2 = boxes.T
-            cx = (x1 + x2) / 2 / w
-            cy = (y1 + y2) / 2 / h
-            bw = (x2 - x1) / w
-            bh = (y2 - y1) / h
-            return torch.stack([cx, cy, bw, bh], dim=1)
+            boxes = boxes.to(device).clone()
+
+            # COCO format: [x, y, width, height] where (x,y) is top-left corner
+            x, y, box_w, box_h = boxes.T
+
+            # Convert to normalized center coordinates
+            cx = (x + box_w / 2) / w  # center x normalized
+            cy = (y + box_h / 2) / h  # center y normalized
+            w_norm = box_w / w        # width normalized
+            h_norm = box_h / h        # height normalized
+
+            return torch.stack([cx, cy, w_norm, h_norm], dim=1)
 
         formatted = []
 
@@ -215,7 +230,7 @@ class YOLOv5Wrapper(BaseDetectionModel):
             labels = t["class_labels"].unsqueeze(1)
             img_idx = torch.full((len(labels), 1), i)
 
-            xywh = xyxy_to_xywh_norm(boxes, img_size, self.device)
+            xywh = coco_to_xywh_norm(boxes, img_size, self.device)
             merged = torch.cat(
                 [img_idx.to(self.device), labels.to(self.device), xywh.to(self.device)],
                 dim=1,
