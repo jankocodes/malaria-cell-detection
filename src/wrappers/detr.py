@@ -69,6 +69,7 @@ class DetrWrapper(BaseDetectionModel):
 
         # Assign back into model
         self.model.class_labels_classifier = new_classifier
+        self.model.config.num_labels = num_classes
 
         # Make sure new layer is on the correct device
         if self.device is not None:
@@ -84,8 +85,14 @@ class DetrWrapper(BaseDetectionModel):
         if targets is None:
             raise ValueError("targets must be provided during training")
 
+        # Convert targets from COCO format to DETR format
+        # COCO: [x, y, w, h] in pixels
+        # DETR: [x_center, y_center, w, h] normalized to [0, 1]
+        img_h, img_w = images.shape[2:]
+        detr_targets = self._convert_targets_to_detr_format(targets, img_h, img_w)
+
         # HF DETR requires named arguments
-        outputs = self.model(pixel_values=images, labels=targets)
+        outputs = self.model(pixel_values=images, labels=detr_targets)
 
         # HF DETR returns a dict-like object containing loss and loss components
         total_loss = outputs.loss
@@ -95,6 +102,41 @@ class DetrWrapper(BaseDetectionModel):
             "loss": total_loss,
             # "loss_dict": loss_dict, -> optional detailed losses
         }
+
+    def _convert_targets_to_detr_format(
+        self, targets: List[Dict[str, torch.Tensor]], img_h: int, img_w: int
+    ) -> List[Dict[str, torch.Tensor]]:
+        """
+        Convert targets from COCO format to DETR format.
+
+        Args:
+            targets: List of dicts with:
+                - 'boxes': [N, 4] in COCO format [x, y, w, h] (pixels)
+                - 'class_labels': [N] class indices
+            img_h: Image height in pixels
+            img_w: Image width in pixels
+
+        Returns:
+            List of dicts with:
+                - 'boxes': [N, 4] in normalized [x_center, y_center, w, h] format
+                - 'class_labels': [N] class indices
+        """
+        detr_targets = []
+
+        for target in targets:
+            boxes = target["boxes"].clone().float()  # [N, 4]
+            class_labels = target["class_labels"].clone()
+
+            # Convert COCO [x, y, w, h] to DETR [x_center, y_center, w, h]
+            # and normalize to [0, 1]
+            boxes[:, 0] = (boxes[:, 0] + boxes[:, 2] / 2) / img_w  # x_center
+            boxes[:, 1] = (boxes[:, 1] + boxes[:, 3] / 2) / img_h  # y_center
+            boxes[:, 2] = boxes[:, 2] / img_w  # width
+            boxes[:, 3] = boxes[:, 3] / img_h  # height
+
+            detr_targets.append({"boxes": boxes, "class_labels": class_labels})
+
+        return detr_targets
 
     def _forward_eval(self, images: torch.Tensor) -> Dict[str, Any]:
         # Evaluation mode returns predictions
