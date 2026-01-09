@@ -3,6 +3,7 @@ import torch.nn as nn
 from typing import Dict, List, Optional, Tuple
 from .base import BaseDetectionModel
 from yolov5.models.yolo import DetectionModel
+from yolov5.utils.general import non_max_suppression
 
 
 class YOLOv5Wrapper(BaseDetectionModel):
@@ -142,16 +143,41 @@ class YOLOv5Wrapper(BaseDetectionModel):
 
     def _forward_eval(self, images: torch.Tensor) -> dict:
         """
-        Forward pass for evaluation — returns processed predictions.
-
-        Args:
-            images (torch.Tensor): Batch of input images, shape [B, 3, H, W].
+        Forward pass for evaluation — returns final detections.
         """
-        pred = self.model(images)
+        with torch.no_grad():
+            pred = self.model(images)[0]  # decoded predictions
 
-        return {
-            "predictions": pred,
-        }
+            pred = non_max_suppression(
+                pred,
+                conf_thres=0.25,
+                iou_thres=0.45,
+            )
+
+        outputs = []
+
+        for p in pred:
+            if p is None or len(p) == 0:
+                outputs.append(
+                    {
+                        "boxes": torch.empty((0, 4), device=images.device),
+                        "scores": torch.empty((0,), device=images.device),
+                        "labels": torch.empty(
+                            (0,), device=images.device, dtype=torch.long
+                        ),
+                    }
+                )
+                continue
+
+            outputs.append(
+                {
+                    "boxes": p[:, :4],  # xyxy
+                    "scores": p[:, 4],
+                    "labels": p[:, 5].long(),
+                }
+            )
+
+        return {"predictions": outputs}
 
     def compute_loss(
         self,
@@ -175,9 +201,7 @@ class YOLOv5Wrapper(BaseDetectionModel):
             raise ValueError("Loss function not initialized. Set loss_fn in __init__")
 
         # Convert targets to YOLOv5 format
-        yolo_targets = self._convert_targets_to_yolo_format(
-            targets, img_size, self.device
-        )
+        yolo_targets = self._convert_targets_to_yolov5_format(targets, img_size)
 
         # Compute loss using YOLOv5's loss function
         loss, loss_items = self.loss_fn(predictions, yolo_targets)
@@ -185,7 +209,7 @@ class YOLOv5Wrapper(BaseDetectionModel):
         # Return structured loss dict
         return loss, loss_items
 
-    def _convert_targets_to_yolo_format(self, targets, img_size, device="cpu"):
+    def _convert_targets_to_yolov5_format(self, targets, img_size):
         """
         Format batch targets into a unified tensor representation for object detection.
 
@@ -215,8 +239,8 @@ class YOLOv5Wrapper(BaseDetectionModel):
             # Convert to normalized center coordinates
             cx = (x + box_w / 2) / w  # center x normalized
             cy = (y + box_h / 2) / h  # center y normalized
-            w_norm = box_w / w        # width normalized
-            h_norm = box_h / h        # height normalized
+            w_norm = box_w / w  # width normalized
+            h_norm = box_h / h  # height normalized
 
             return torch.stack([cx, cy, w_norm, h_norm], dim=1)
 
