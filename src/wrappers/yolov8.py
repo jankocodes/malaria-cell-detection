@@ -1,6 +1,7 @@
 from typing import List, Dict, Tuple, Optional
 import torch
 from ultralytics.nn.tasks import DetectionModel
+from ultralytics.utils.nms import non_max_suppression
 
 if __name__ == "__main__":
     from base import BaseDetectionModel
@@ -81,18 +82,50 @@ class YOLOv8Wrapper(BaseDetectionModel):
 
         return {"loss": total_loss, "loss_items": loss_items}
 
-    def _forward_eval(self, images: torch.Tensor) -> Dict[str, List[torch.Tensor]]:
+    def _forward_eval(
+        self, images: torch.Tensor
+    ) -> Dict[str, List[Dict[str, torch.Tensor]]]:
         """
-        Evaluation forward pass.
-
-        DetectionModel returns raw predictions that need to be decoded.
-        The predictions are in the format of [P3, P4, P5] multi-scale outputs.
+        Evaluation forward pass for YOLOv8 DetectionModel.
+        Returns evaluator-ready predictions.
         """
-        pred = self.model(images)
+        with torch.no_grad():
+            preds = self.model(images)  # [B, N, 4 + 1 + C]
 
-        # TODO: implement NMS and decoding if needed
+            preds = non_max_suppression(
+                preds,
+                conf_thres=0.0,
+                iou_thres=0.45,
+                multi_label=False,
+                agnostic=False,
+                max_det=300,
+            )
 
-        return pred
+        outputs = []
+
+        for p in preds:
+            if p is None or len(p) == 0:
+                outputs.append(
+                    {
+                        "boxes": torch.empty((0, 4), device=images.device),
+                        "scores": torch.empty((0,), device=images.device),
+                        "labels": torch.empty(
+                            (0,), device=images.device, dtype=torch.long
+                        ),
+                    }
+                )
+                continue
+
+            # p format: [x1, y1, x2, y2, score, class]
+            outputs.append(
+                {
+                    "boxes": p[:, :4],
+                    "scores": p[:, 4],
+                    "labels": p[:, 5].long(),
+                }
+            )
+
+        return {"predictions": outputs}
 
     def compute_loss(
         self,
@@ -195,7 +228,9 @@ class YOLOv8Wrapper(BaseDetectionModel):
         else:
             batch_idx = torch.tensor([], dtype=torch.long, device=self.device)
             cls = torch.tensor([], dtype=torch.long, device=self.device)
-            bboxes = torch.tensor([], dtype=torch.float32, device=self.device).view(0, 4)
+            bboxes = torch.tensor([], dtype=torch.float32, device=self.device).view(
+                0, 4
+            )
 
         batch_dict = {"batch_idx": batch_idx, "cls": cls, "bboxes": bboxes}
 
