@@ -3,6 +3,9 @@ import torch.nn as nn
 from typing import Dict, List, Optional, Tuple, Any
 from .base import BaseDetectionModel
 from transformers import DetrForObjectDetection
+import torch
+from typing import Dict, Any, List
+from torchvision.ops import box_convert
 
 
 class DetrWrapper(BaseDetectionModel):
@@ -15,20 +18,19 @@ class DetrWrapper(BaseDetectionModel):
     Attributes:
         model (nn.Module): The underlying Detr model instance
         num_classes (int): Number of object classes for detection
-        loss_fn (callable): Loss function for training (ComputeLoss or custom)
+        loss_fn (callable): Loss function for training (optional)
         device: Computation device (CPU or GPU)
 
     Methods:
-        forward(images, targets): Execute model forward pass and compute loss
-        compute_loss(predictions, targets, img_size): Calculate detection losses
         _set_num_classes(num_classes): Adapt model architecture for target class count
-        _init_default_loss(): Initialize Detr's native loss function
-        _convert_targets_to_yolo_format(targets, img_size, device): Transform target annotations
+        _forward_train(images, targets): Execute model forward pass and compute loss during training
+        _forward_eval(images): Execute model forward pass for evaluation/inference
+        _convert_targets_to_detr_format(targets, img_h, img_w): Convert targets from COCO to DETR format
 
     Example:
         >>> model = DetrWrapper(Detr_model, num_classes=80, device='cuda')
         >>> output = model(images, targets)
-        >>> predictions, loss = output['predictions'], output['loss']
+        >>> loss = output['loss']
     """
 
     def __init__(
@@ -139,10 +141,60 @@ class DetrWrapper(BaseDetectionModel):
         return detr_targets
 
     def _forward_eval(self, images: torch.Tensor) -> Dict[str, Any]:
-        # Evaluation mode returns predictions
-        outputs = self.model(images)
-        predictions = (outputs["logits"], outputs["pred_boxes"])
+        """
+        Evaluation forward pass for DETR with post-processing.
 
-        return {
-            "predictions": predictions,
-        }
+        Returns YOLO-style predictions:
+        - boxes: xyxy (pixels)
+        - scores: confidence scores
+        - labels: class indices
+        """
+        with torch.no_grad():
+            outputs = self.model(images)
+
+        logits = outputs.logits  # [B, Q, C+1]
+        boxes = outputs.pred_boxes  # [B, Q, 4] (cxcywh, normalized)
+
+        # Convert class logits → probabilities (drop no-object)
+        probs = logits.softmax(-1)[..., :-1]
+        scores, labels = probs.max(-1)  # [B, Q]
+
+        B, Q, _ = boxes.shape
+        _, _, H, W = images.shape
+
+        boxes_xyxy = box_convert(
+            boxes.view(-1, 4), in_fmt="cxcywh", out_fmt="xyxy"
+        ).view(B, Q, 4)
+
+        # Scale to pixel coordinates
+        scale = torch.tensor([W, H, W, H], device=boxes.device)
+        boxes_xyxy = boxes_xyxy * scale
+
+        outputs_pp: List[Dict[str, torch.Tensor]] = []
+
+        conf_thresh = 0.25  # keep consistent with YOLO
+
+        for b in range(B):
+            keep = scores[b] > conf_thresh
+
+            if keep.sum() == 0:
+                outputs_pp.append(
+                    {
+                        "boxes": torch.empty((0, 4), device=boxes.device),
+                        "scores": torch.empty((0,), device=boxes.device),
+                        "labels": torch.empty(
+                            (0,), device=boxes.device, dtype=torch.long
+                        ),
+                    }
+                )
+                continue
+
+            outputs_pp.append(
+                {
+                    "boxes": boxes_xyxy[b][keep],
+                    "scores": scores[b][keep],
+                    "labels": labels[b][keep],
+                }
+            )
+
+        return {"predictions": outputs_pp}
