@@ -16,3 +16,6 @@ slurm/
 .cache/
 .matplotlib/
 *locally.py
+*.md
+.claude
+src/models

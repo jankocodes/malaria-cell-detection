@@ -28,14 +28,17 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
 
     # --- Load Data ---
     print("Loading datasets...")
+    img_size = hyp.get("img_size", 640)  # Default to 640 if not specified
     train_dataset = BloodCellDataset(
         annotations_file=f"{data_path}/train.json",
         img_dir=f"{data_path}/train",
+        img_size=img_size,
     )
 
     val_dataset = BloodCellDataset(
         annotations_file=f"{data_path}/val.json",
         img_dir=f"{data_path}/val",
+        img_size=img_size,
     )
 
     train_loader = DataLoader(
