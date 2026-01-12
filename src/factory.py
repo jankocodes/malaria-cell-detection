@@ -15,7 +15,8 @@ from wrappers.yolov5 import YOLOv5Wrapper
 from wrappers.retinanet import RetinaNetWrapper
 from wrappers.detr import DetrWrapper
 from wrappers.yolov8 import YOLOv8Wrapper
-from typing import Literal, Any
+from wrappers.base import BaseDetectionModel
+from typing import Any
 
 from enum import Enum
 
@@ -83,7 +84,7 @@ class ModelFactory:
         model_type: ModelType,
         model_dir: str = None,
         **kwargs: Any,
-    ):
+    ) -> BaseDetectionModel:
         """
         Load a model by type using the corresponding factory method.
         """
@@ -118,46 +119,44 @@ class ModelFactory:
     ) -> YOLOv8Wrapper:
 
         weights_path = Path(model_dir) / f"{model_name}.pt"
+        yaml_path = Path(model_dir) / f"{model_name}.yml"
+        model = DetectionModel(yaml_path)  # create model from config
 
         if pretrained:
-            wrapper = YOLO(str(weights_path))
-            model = wrapper.model
+            # 1. Build model with correct nc
+            model.nc = self.num_classes
+            model.names = list(range(self.num_classes))
 
-        else:
-            yaml_path = Path(model_dir) / f"{model_name}.yml"
+            print("🔁 Loading pretrained YOLOv8 weights (head will be skipped)...")
 
-            print("⚠ Loading YOLOv8 model without pretrained weights...")
-
-            # Create model from config
-            model = DetectionModel(yaml_path)
             ckpt = torch.load(weights_path, map_location="cpu")
 
-            if "model" in ckpt:
-                state_dict = (
-                    ckpt["model"].state_dict()
-                    if hasattr(ckpt["model"], "state_dict")
-                    else ckpt["model"]
-                )
-            else:
-                print("is dict")
-                state_dict = ckpt  # raw state_dict
+            state_dict = (
+                ckpt["model"].state_dict()
+                if isinstance(ckpt, dict) and "model" in ckpt
+                else ckpt
+            )
 
-            # filter fitting weights
-            filtered_dict = {}
+            # 2. Filter incompatible head weights
+            filtered = {}
+            model_sd = model.state_dict()
+
             for k, v in state_dict.items():
-                if k in model.state_dict() and model.state_dict()[k].shape == v.shape:
-                    filtered_dict[k] = v
+                if k in model_sd and model_sd[k].shape == v.shape:
+                    filtered[k] = v
                 else:
-                    print(
-                        f"Skipping {k}, shape mismatch: {v.shape} vs {model.state_dict()[k].shape}"
-                    )
+                    if "cv3" in k:
+                        print(f"Skipping head weight: {k}")
+                    else:
+                        print(f"Skipping {k}: {v.shape} vs {model_sd.get(k)}")
 
-            # Load filtered weights
-            missing, unexpected = model.load_state_dict(filtered_dict, strict=False)
+            missing, unexpected = model.load_state_dict(filtered, strict=False)
 
-            print("Missing: ", missing)
-            print("Unexpected: ", unexpected)
-
+            print("Missing:", missing)
+            print("Unexpected:", unexpected)
+            print("✅ Pretrained YOLOv8 weights loaded.")
+        else:
+            print("⚠️ Initializing YOLOv8 model with random weights.")
         # return YOLOv8Wrapper(model, num_classes=7, device=DEVICE)
         return YOLOv8Wrapper(
             model,
