@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional
 from .base import BaseDetectionModel
 from torchvision.models.detection import RetinaNet
 import torch
@@ -97,26 +97,8 @@ class RetinaNetWrapper(BaseDetectionModel):
         Args:
             images (torch.Tensor): Batch of input images, shape [B, 3, H, W].
         """
-        outputs = self.model(images)  # List of dicts per image
-
-        batch_boxes = []
-        batch_scores = []
-        batch_labels = []
-
-        for output in outputs:
-            boxes = output["boxes"]  # (N, 4)
-            scores = output["scores"]  # (N,)
-            labels = output["labels"]  # (N,)
-
-            batch_boxes.append(boxes)
-            batch_scores.append(scores)
-            batch_labels.append(labels)
-
-        # return {
-        #     "boxes": batch_boxes,
-        #     "scores": batch_scores,
-        #     "labels": batch_labels,
-        # }
+        with torch.no_grad():
+            outputs = self.model(images)  # List of dicts per image
 
         return {
             "predictions": outputs,
