@@ -19,3 +19,4 @@ slurm/
 *.md
 .claude
 src/models
+configs/
