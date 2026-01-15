@@ -3,7 +3,8 @@ from factory import ModelFactory
 from data.dataset import BloodCellDataset
 from torch.utils.data import DataLoader
 from training.lr_finder import find_lr
-from data.util import collate_fn
+from data.util import collate_fn  #
+from training.util import freeze_detr_backbone
 from factory import ModelType
 import argparse
 import yaml
@@ -25,6 +26,10 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
         pretrained=model_cfg["pretrained"],
         model_dir=model_dir,
     )
+
+    if model_cfg["type"] == "detr":
+        freeze_detr_backbone(model)
+        print("✅ Frozen DETR backbone for LR finder.")
 
     # --- Load Data ---
     print("Loading datasets...")

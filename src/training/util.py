@@ -1,5 +1,7 @@
 import torch
 from tqdm import tqdm
+from wrappers import detr
+from wrappers.detr import DetrWrapper
 
 
 def train_one_epoch(
@@ -84,3 +86,9 @@ def train_one_epoch(
     )
 
     return result
+
+
+def freeze_detr_backbone(detr: DetrWrapper):
+    # Freeze the backbone for LR finder
+    for param in detr.model.model.backbone.parameters():
+        param.requires_grad = False
