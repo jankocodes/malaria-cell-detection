@@ -18,6 +18,10 @@ class BaseDetectionModel(ABC, nn.Module):
         self.train()
         self._set_num_classes(num_classes)
 
+        # Enable gradients for all parameters (they may be frozen when loaded from YOLO)
+        for param in self.model.parameters():
+            param.requires_grad = True
+
     def forward(
         self,
         images: torch.Tensor,

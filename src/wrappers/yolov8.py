@@ -29,10 +29,6 @@ class YOLOv8Wrapper(BaseDetectionModel):
     ):
         super().__init__(model=model, num_classes=num_classes, device=device)
 
-        # Enable gradients for all parameters (they may be frozen when loaded from YOLO)
-        for param in self.model.parameters():
-            param.requires_grad = True
-
         self.loss_fn = loss_fn
         if self.loss_fn is None:
             self._init_default_loss()
