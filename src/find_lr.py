@@ -51,10 +51,18 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
     # --- Training Loop ---
     print("Finding learning rate...")
 
+    base_lr = hyp.get("base_lr")  # Default to 0.001 if not specified
+
+    if model_cfg["pretrained"]:
+        base_lr /= 10
+
+    min_lr = base_lr / 10
+    max_lr = base_lr * 10
+
     result = find_lr(
         model=model,
-        min_lr=hyp["min_lr"],
-        max_lr=hyp["max_lr"],
+        min_lr=min_lr,
+        max_lr=max_lr,
         train_loader=train_loader,
         show_progress=show_progress,
     )
