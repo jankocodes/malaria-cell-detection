@@ -109,7 +109,6 @@ def plot_lr_finder_results(
     log_lr=True,
     display_suggestion=True,
     figsize=(8, 5),
-    save_path=None,
 ):
     """
     Enhanced visualization for FastAI's LRFinder using its built-in plot().
@@ -122,7 +121,6 @@ def plot_lr_finder_results(
         log_lr: Whether to use log-scale LR.
         display_suggestion: Show FastAI's suggested LR marker.
         figsize: Figure size passed to plt.subplots.
-        save_path: Optional output path for the figure.
     """
     # --- Call FastAI plot ---
     ax = lr_finder.plot(
@@ -169,8 +167,7 @@ def plot_lr_finder_results(
     fig = ax.figure
     fig.tight_layout()
 
-    if save_path is None:
-        save_path = f"lr_finder_plot_{model_name}.png"
+    save_path = f"lr_finder_plot_{model_name}.png"
 
     fig.savefig(save_path, dpi=200, bbox_inches="tight")
     print(f"LR finder plot saved to: {save_path}")
