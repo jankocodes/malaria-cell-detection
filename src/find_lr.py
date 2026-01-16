@@ -4,7 +4,7 @@ from data.dataset import BloodCellDataset
 from torch.utils.data import DataLoader
 from training.lr_finder import find_lr
 from data.util import collate_fn  #
-from training.util import freeze_detr_backbone
+from training.util import freeze_detr_backbone, plot_lr_finder_results
 from factory import ModelType
 import argparse
 import yaml
@@ -59,7 +59,7 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
     min_lr = base_lr / 10
     max_lr = base_lr * 10
 
-    result = find_lr(
+    lr_finder = find_lr(
         model=model,
         min_lr=min_lr,
         max_lr=max_lr,
@@ -68,17 +68,10 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
     )
 
     # --- Log Results and Save Plot ---
-    print(f"Learning rate search completed. Results: {result.get_results()}")
-    print(f"Suggested LR: {result.lr_suggestion()}")
+    print(f"Learning rate search completed. Results: {lr_finder.get_results()}")
+    print(f"Suggested LR: {lr_finder.lr_suggestion()}")
 
-    if hasattr(result, "plot"):
-        result.plot()
-        import matplotlib.pyplot as plt
-
-        plt.savefig(
-            f"lr_finder_plot_{model_cfg['type']}.png", dpi=150, bbox_inches="tight"
-        )
-        print("Plot saved as 'lr_finder_plot.png'")
+    plot_lr_finder_results(lr_finder, model_name=model_cfg["type"], save_path=plot_name)
 
 
 if __name__ == "__main__":
