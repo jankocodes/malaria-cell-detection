@@ -5,7 +5,8 @@ from wrappers.detr import DetrWrapper
 import numpy as np
 from matplotlib.ticker import LogFormatterSciNotation, LogLocator
 from ignite.handlers import FastaiLRFinder
-
+from factory import ModelType
+from wrappers.base import BaseDetectionModel
 import numpy as np
 from matplotlib.ticker import LogLocator
 from matplotlib.ticker import NullLocator
@@ -173,3 +174,27 @@ def plot_lr_finder_results(
     print(f"LR finder plot saved to: {save_path}")
 
     return ax
+
+
+def get_optimizer(
+    model: BaseDetectionModel,
+    model_type: ModelType,
+    lr: float,
+) -> torch.optim.Optimizer:
+    """Get the optimizer from the model type."""
+    if model_type in {ModelType.YOLOV5, ModelType.YOLOV8, ModelType.RETINANET}:
+        optimizer = torch.optim.SGD(
+            model.parameters(),
+            lr=lr,
+        )
+    elif model_type == ModelType.DETR:
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=lr,
+        )
+    else:
+        raise ValueError(f"Unsupported model type: {model_type}")
+
+    print(f"Using optimizer: {optimizer}")
+
+    return optimizer

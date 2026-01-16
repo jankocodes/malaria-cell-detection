@@ -4,7 +4,7 @@ from data.dataset import BloodCellDataset
 from torch.utils.data import DataLoader
 from training.lr_finder import find_lr
 from data.util import collate_fn  #
-from training.util import freeze_detr_backbone, plot_lr_finder_results
+from training.util import freeze_detr_backbone, get_optimizer, plot_lr_finder_results
 from factory import ModelType
 import argparse
 import yaml
@@ -53,15 +53,22 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
 
     base_lr = hyp.get("base_lr")  # Default to 0.001 if not specified
 
-    if model_cfg["pretrained"]:
+    if model_cfg["pretrained"]:  # lower LR for pretrained models
         base_lr /= 10
 
     min_lr = base_lr / 10
     max_lr = base_lr * 10
 
+    # --- Optimizer ---
+    optimizer = get_optimizer(
+        model=model,
+        model_type=ModelType(model_cfg["type"]),
+        lr=min_lr,
+    )
+
     lr_finder = find_lr(
         model=model,
-        min_lr=min_lr,
+        optimizer=optimizer,
         max_lr=max_lr,
         train_loader=train_loader,
         show_progress=show_progress,

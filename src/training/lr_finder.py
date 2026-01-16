@@ -11,7 +11,7 @@ from ignite.contrib.handlers import ProgressBar
 
 def find_lr(
     model: torch.nn.Module,
-    min_lr: float,
+    optimizer: torch.optim.Optimizer,
     max_lr: float,
     train_loader: DataLoader,
     show_progress: bool = True,
@@ -47,7 +47,6 @@ def find_lr(
     # ---------------------------------------------------------
     # 3. Ignite trainer engine
     # ---------------------------------------------------------
-    optimizer = torch.optim.AdamW(model.parameters(), lr=min_lr)
 
     trainer = Engine(step_fn)
 

@@ -2,7 +2,7 @@ import torch
 from factory import ModelFactory
 from data.dataset import BloodCellDataset
 from torch.utils.data import DataLoader
-from training.util import train_one_epoch
+from training.util import *
 from data.util import collate_fn
 from factory import ModelType
 import argparse
@@ -58,7 +58,11 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
     )
 
     # --- Optimizer ---
-    optimizer = torch.optim.AdamW(model.parameters(), lr=hyp["learning_rate"])
+    optimizer = get_optimizer(
+        model=model,
+        model_type=ModelType(model_cfg["type"]),
+        lr=hyp.get("lr"),
+    )
 
     # --- Training Loop ---
     print("Starting training...")
