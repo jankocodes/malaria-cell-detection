@@ -13,7 +13,6 @@ def train_one_epoch(
     model, train_loader, val_loader, optimizer, epoch, show_progress=True
 ):
     device = model.device
-    print(f"[DEBUG] Model device: {device}")
 
     # --- Training ---
     model.train()

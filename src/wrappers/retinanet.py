@@ -114,12 +114,6 @@ class RetinaNetWrapper(BaseDetectionModel):
         # Forward pass
         outputs = self.model(images, coco_targets)  # returns losses
 
-        for k, v in outputs.items():
-            if isinstance(v, torch.Tensor):
-                print(
-                    f"[DEBUG][_forward_train] output '{k}' device: {v.device}, dtype: {v.dtype}"
-                )
-
         # Assuming your outputs dict contains classification and bbox_regression
         cls_loss = outputs.get("classification", outputs.get("loss_classifier"))
         box_loss = outputs.get("bbox_regression", outputs.get("loss_box_reg"))
