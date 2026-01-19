@@ -7,6 +7,7 @@ from data.util import collate_fn
 from factory import ModelType
 import argparse
 import yaml
+from torch.optim.lr_scheduler import OneCycleLR
 
 
 def main(cfg, data_path=None, show_progress=True, model_dir=None):
@@ -58,11 +59,25 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
         collate_fn=collate_fn,
     )
 
+    lr = hyp.get("lr")
+
     # --- Optimizer ---
     optimizer = get_optimizer(
         model=model,
         model_type=ModelType(model_cfg["type"]),
-        lr=hyp.get("lr"),
+        lr=lr,
+    )
+
+    # --- LR Scheduler ---
+
+    steps_per_epoch = len(train_loader)
+    epochs = 10  # total epochs you want to train
+
+    scheduler = OneCycleLR(
+        optimizer,
+        max_lr=lr,
+        steps_per_epoch=steps_per_epoch,
+        epochs=epochs,
     )
 
     # --- Training Loop ---
@@ -73,6 +88,7 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
             train_loader=train_loader,
             val_loader=val_loader,
             optimizer=optimizer,
+            scheduler=scheduler,
             epoch=epoch,
             show_progress=show_progress,
         )

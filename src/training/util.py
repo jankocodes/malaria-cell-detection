@@ -1,14 +1,20 @@
 import torch
 from tqdm import tqdm
-from wrappers.detr import DetrWrapper
 from factory import ModelType
 from wrappers.base import BaseDetectionModel
+from torch.utils.data import DataLoader
 import numpy as np
 import random
 
 
 def train_one_epoch(
-    model, train_loader, val_loader, optimizer, epoch, show_progress=True
+    model: BaseDetectionModel,
+    train_loader: DataLoader,
+    val_loader: DataLoader,
+    optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler._LRScheduler,
+    epoch,
+    show_progress=True,
 ):
     device = model.device
 
@@ -16,11 +22,11 @@ def train_one_epoch(
     model.train()
     total_train_loss = 0
 
-    pbar = tqdm(
+    training_pbar = tqdm(
         train_loader, desc=f"Training - Epoch {epoch +1}", disable=not show_progress
     )
 
-    for batch_idx, (images, targets) in enumerate(pbar):
+    for batch_idx, (images, targets) in enumerate(training_pbar):
         images = images.float().to(device)
 
         if len(targets) == 0:
@@ -43,21 +49,24 @@ def train_one_epoch(
         optimizer.zero_grad()
         train_loss.backward()
         optimizer.step()
+        scheduler.step()
 
         total_train_loss += train_loss.item()
 
-        pbar.set_postfix({"loss": f"{train_loss.item():.4f}"})
+        training_pbar.set_postfix({"loss": f"{train_loss.item():.4f}"})
+    for i, param_group in enumerate(optimizer.param_groups):
+        print(f"Param group {i} LR: {param_group['lr']:.6f}")
 
     # --- Validation ---
     with torch.no_grad():
         total_val_loss = 0
 
-        pbar = tqdm(
+        val_pbar = tqdm(
             val_loader, desc=f"Validation - Epoch {epoch +1}", disable=not show_progress
         )
 
         # validation
-        for batch_idx, (images, targets) in enumerate(pbar):
+        for batch_idx, (images, targets) in enumerate(val_pbar):
             images = images.float().to(device)
 
             if len(targets) == 0:
@@ -77,7 +86,7 @@ def train_one_epoch(
             val_loss = loss["loss"]
             total_val_loss += val_loss.item()
 
-            pbar.set_postfix({"loss": f"{val_loss.item():.4f}"})
+            val_pbar.set_postfix({"loss": f"{val_loss.item():.4f}"})
 
     result = {}
     result["train_loss"] = total_train_loss / len(train_loader)
