@@ -29,9 +29,6 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
         model_dir=model_dir,
     )
 
-    if model_cfg["type"] == "detr":
-        freeze_detr_backbone(model)
-        print("✅ Frozen DETR backbone for LR finder.")
 
     # --- Load Data ---
     print("Loading datasets...")
