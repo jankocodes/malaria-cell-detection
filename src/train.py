@@ -10,6 +10,7 @@ import yaml
 
 
 def main(cfg, data_path=None, show_progress=True, model_dir=None):
+    set_random_seed(42)
 
     hyp = cfg["hyp"]
     model_cfg = cfg["model"]

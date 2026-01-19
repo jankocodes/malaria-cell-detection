@@ -2,15 +2,17 @@ import torch
 from factory import ModelFactory
 from data.dataset import BloodCellDataset
 from torch.utils.data import DataLoader
-from training.lr_finder import find_lr
-from data.util import collate_fn  #
-from training.util import freeze_detr_backbone, get_optimizer, plot_lr_finder_results
+from training.lr_finder import *
+from data.util import collate_fn
+from training.util import *
 from factory import ModelType
 import argparse
 import yaml
 
 
 def main(cfg, data_path=None, show_progress=True, model_dir=None):
+
+    set_random_seed(42)
 
     hyp = cfg["hyp"]
     model_cfg = cfg["model"]
