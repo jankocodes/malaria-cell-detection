@@ -78,7 +78,9 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
     print(f"Learning rate search completed. Results: {lr_finder.get_results()}")
     print(f"Suggested LR: {lr_finder.lr_suggestion()}")
 
-    plot_lr_finder_results(lr_finder, model_name=model_cfg["type"])
+    plot_lr_finder_results(
+        lr_finder, model_name=model_cfg["type"], range=(min_lr, max_lr)
+    )
 
 
 if __name__ == "__main__":

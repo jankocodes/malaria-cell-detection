@@ -1,13 +1,10 @@
 import torch
 from tqdm import tqdm
-from wrappers import detr
 from wrappers.detr import DetrWrapper
-import numpy as np
 from matplotlib.ticker import LogFormatterSciNotation, LogLocator
 from ignite.handlers import FastaiLRFinder
 from factory import ModelType
 from wrappers.base import BaseDetectionModel
-import numpy as np
 from matplotlib.ticker import LogLocator
 from matplotlib.ticker import NullLocator
 
@@ -104,9 +101,10 @@ def freeze_detr_backbone(detr: DetrWrapper):
 
 def plot_lr_finder_results(
     lr_finder: FastaiLRFinder,
-    model_name="model",
+    model_name: str,
+    range: tuple,
     skip_start=0,
-    skip_end=0,
+    skip_end=1,
     log_lr=True,
     display_suggestion=True,
     figsize=(8, 5),
@@ -132,8 +130,13 @@ def plot_lr_finder_results(
         figsize=figsize,
     )
 
+    lr_min, lr_max = range
+
     # --- Improve title and labels ---
-    ax.set_title(f"Learning Rate Finder – {model_name}", fontsize=14)
+    ax.set_title(
+        f"Learning Rate Finder – {model_name}",
+        fontsize=14,
+    )
     ax.set_xlabel("Learning Rate (log scale)" if log_lr else "Learning Rate")
     ax.set_ylabel("Loss")
 
@@ -143,6 +146,9 @@ def plot_lr_finder_results(
         ax.xaxis.set_minor_locator(NullLocator())  # <-- CRITICAL
         ax.xaxis.set_major_locator(LogLocator(base=10, numticks=6))
         ax.xaxis.set_major_formatter(LogFormatterSciNotation())
+
+    # --- Force LR range ---
+    ax.set_xlim(lr_min, lr_max)
 
     # --- Improve grid aesthetics ---
     ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.6)
