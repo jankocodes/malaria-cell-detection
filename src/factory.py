@@ -90,28 +90,28 @@ class ModelFactory:
         """
 
         if model_type == ModelType.YOLOV8:
-            return self.load_yolo_v8(
+            return self.load_yolov8(
                 model_dir=model_dir if model_dir is not None else "models/yolov8",
                 **kwargs,
             )
 
         elif model_type == ModelType.YOLOV5:
-            return self.load_yolo_v5(
+            return self.load_yolov5(
                 model_dir=model_dir if model_dir is not None else "models/yolov5",
                 **kwargs,
             )
 
         elif model_type == ModelType.RETINANET:
-            return self.load_retinanet_pipeline(**kwargs)
+            return self.load_retinanet(**kwargs)
 
         elif model_type == ModelType.DETR:
-            return self.load_detr_pipeline(**kwargs)
+            return self.load_detr(**kwargs)
 
         else:
             # This should never happen, but is nice for defensive programming
             raise NotImplementedError(f"Model type {model_type} not implemented.")
 
-    def load_yolo_v8(
+    def load_yolov8(
         self,
         pretrained: bool = True,
         model_name: str = "yolov8s",
@@ -164,7 +164,7 @@ class ModelFactory:
             device=self.device,
         )
 
-    def load_yolo_v5(
+    def load_yolov5(
         self,
         repo_path: str = "ultralytics/yolov5",
         pretrained: bool = True,
@@ -201,7 +201,7 @@ class ModelFactory:
             device=self.device,
         )
 
-    def load_retinanet_pipeline(
+    def load_retinanet(
         self,
         pretrained=True,
         weights=RetinaNet_ResNet50_FPN_Weights.DEFAULT,
@@ -217,7 +217,7 @@ class ModelFactory:
             device=self.device,
         )
 
-    def load_detr_pipeline(
+    def load_detr(
         self,
         pretrained=True,
         weights="facebook/detr-resnet-50",
@@ -231,7 +231,10 @@ class ModelFactory:
             )
         else:
             model = DetrForObjectDetection(
-                config=DetrConfig(num_labels=self.num_classes)
+                config=DetrConfig(
+                    use_pretrained_backbone=False,
+                    num_labels=self.num_classes,
+                )
             )
         return DetrWrapper(
             model=model,
