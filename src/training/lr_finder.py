@@ -1,4 +1,5 @@
 import torch
+import os
 from torch.utils.data import DataLoader
 from ignite.engine import Engine
 from ignite.handlers import FastaiLRFinder
@@ -77,6 +78,7 @@ def plot_lr_finder_results(
     lr_finder: FastaiLRFinder,
     model_name: str,
     range: tuple,
+    model_pretrained_str: str,
     skip_start=0,
     skip_end=1,
     log_lr=True,
@@ -108,7 +110,7 @@ def plot_lr_finder_results(
 
     # --- Improve title and labels ---
     ax.set_title(
-        f"Learning Rate Finder – {model_name}",
+        f"Learning Rate Finder – {model_name} ({model_pretrained_str})",
         fontsize=14,
     )
     ax.set_xlabel("Learning Rate (log scale)" if log_lr else "Learning Rate")
@@ -148,7 +150,11 @@ def plot_lr_finder_results(
     fig = ax.figure
     fig.tight_layout()
 
-    save_path = f"lr_finder_plot_{model_name}.png"
+    save_dir = os.path.join("plots", "lr_finder", model_pretrained_str)
+    save_path = os.path.join(save_dir, f"lr_finder_plot_{model_name}.png")
+
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
     fig.savefig(save_path, dpi=200, bbox_inches="tight")
     print(f"LR finder plot saved to: {save_path}")

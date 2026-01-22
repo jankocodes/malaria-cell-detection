@@ -8,6 +8,8 @@ from training.util import *
 from factory import ModelType
 import argparse
 import yaml
+import os
+import json
 
 
 def main(cfg, data_path=None, show_progress=True, model_dir=None):
@@ -22,13 +24,13 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
     print(f"Using device: {device}")
 
     # --- Load Model ---
+    model_type_str = model_cfg["type"]
     factory = ModelFactory(device=device, num_classes=model_cfg["num_classes"])
     model = factory.load(
-        model_type=ModelType(model_cfg["type"]),
+        model_type=ModelType(model_type_str),
         pretrained=model_cfg["pretrained"],
         model_dir=model_dir,
     )
-
 
     # --- Load Data ---
     print("Loading datasets...")
@@ -73,12 +75,28 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
         show_progress=show_progress,
     )
 
-    # --- Log Results and Save Plot ---
-    print(f"Learning rate search completed. Results: {lr_finder.get_results()}")
-    print(f"Suggested LR: {lr_finder.lr_suggestion()}")
+    # --- Log Results ---
 
+    results = lr_finder.get_results()
+    suggestion = lr_finder.lr_suggestion()
+    print(f"Learning rate search completed. Results: {results}")
+    print(f"Suggested LR: {suggestion}")
+
+    # --- Save Results as JSON ---
+    model_pretrained_str = "pretrained" if model_cfg["pretrained"] else "from_scratch"
+
+    save_dir = os.path.join("results", "lr_finder", model_pretrained_str)
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, f"{model_type_str}_lr_finder_results.json")
+    with open(save_path, "w") as f:
+        json.dump({"results": results, "suggested_lr": suggestion}, f, indent=2)
+
+    # --- Plot Results ---
     plot_lr_finder_results(
-        lr_finder, model_name=model_cfg["type"], range=(min_lr, max_lr)
+        lr_finder,
+        model_name=model_type_str,
+        range=(min_lr, max_lr),
+        model_pretrained_str=model_pretrained_str,
     )
 
 
