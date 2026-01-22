@@ -109,11 +109,13 @@ def get_optimizer(
         optimizer = torch.optim.SGD(
             model.parameters(),
             lr=lr,
+            weight_decay=1e-4,
         )
     elif model_type == ModelType.DETR:
         optimizer = torch.optim.AdamW(
             model.parameters(),
             lr=lr,
+            weight_decay=1e-4,
         )
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
