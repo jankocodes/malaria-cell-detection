@@ -87,12 +87,12 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
 
     save_dir = os.path.join("results", "lr_finder", model_pretrained_str)
     os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f"{model_type_str}_lr_finder_results.json")
+    save_path = os.path.join(save_dir, f"{model_type_str }_lr_finder_results.json")
     with open(save_path, "w") as f:
         json.dump({"results": results, "suggested_lr": suggestion}, f, indent=2)
 
     # --- Plot Results ---
-    plot_lr_finder_results(
+    save_and_plot_lr_finder_results(
         lr_finder,
         model_name=model_type_str,
         range=(min_lr, max_lr),

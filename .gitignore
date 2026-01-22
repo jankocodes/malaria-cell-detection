@@ -20,3 +20,4 @@ slurm/
 .claude
 src/models
 configs/
+results/

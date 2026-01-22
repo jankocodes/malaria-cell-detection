@@ -74,7 +74,7 @@ def find_lr(
     return lr_finder
 
 
-def plot_lr_finder_results(
+def save_and_plot_lr_finder_results(
     lr_finder: FastaiLRFinder,
     model_name: str,
     range: tuple,

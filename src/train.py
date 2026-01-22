@@ -1,9 +1,7 @@
 import torch
 from factory import ModelFactory
-from data.dataset import BloodCellDataset
-from torch.utils.data import DataLoader
 from training.util import *
-from data.util import collate_fn
+from data.util import *
 from factory import ModelType
 import argparse
 import yaml
@@ -30,38 +28,10 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
 
     # --- Load Data ---
     print("Loading datasets...")
-    img_size = hyp.get("img_size", 640)  # Default to 640 if not specified
-    train_dataset = BloodCellDataset(
-        annotations_file=f"{data_path}/train.json",
-        img_dir=f"{data_path}/train",
-        img_size=img_size,
-    )
-
-    val_dataset = BloodCellDataset(
-        annotations_file=f"{data_path}/val.json",
-        img_dir=f"{data_path}/val",
-        img_size=img_size,
-    )
-
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=hyp["batch_size"],
-        shuffle=True,
-        num_workers=hyp["num_workers"],
-        collate_fn=collate_fn,
-    )
-
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=hyp["batch_size"],
-        shuffle=False,
-        num_workers=hyp["num_workers"],
-        collate_fn=collate_fn,
-    )
-
-    lr = hyp.get("lr")
+    train_loader, val_loader = load_dataloaders(data_path, hyp)
 
     # --- Optimizer ---
+    lr = hyp.get("lr")
     optimizer = get_optimizer(
         model=model,
         model_type=ModelType(model_cfg["type"]),
@@ -69,15 +39,15 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
     )
 
     # --- LR Scheduler ---
+    num_epochs = hyp["num_epochs"]
 
     steps_per_epoch = len(train_loader)
-    epochs = 10  # total epochs you want to train
 
     scheduler = OneCycleLR(
         optimizer,
         max_lr=lr,
         steps_per_epoch=steps_per_epoch,
-        epochs=epochs,
+        epochs=num_epochs,
     )
 
     # --- Training Loop ---
