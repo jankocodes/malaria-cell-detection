@@ -52,7 +52,10 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
 
     # --- Training Loop ---
     print("Starting training...")
-    for epoch in range(hyp["num_epochs"]):
+
+    results = {"train_loss": [], "val_loss": []}
+
+    for epoch in range(num_epochs):
         result = train_one_epoch(
             model=model,
             train_loader=train_loader,
@@ -63,6 +66,16 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
             show_progress=show_progress,
         )
         print(result)
+
+        # Log results
+        results["train_loss"].append(result.get("train_loss"))
+        results["val_loss"].append(result.get("val_loss"))
+
+    # --- Save Results as JSON ---
+    save_and_plot_train_results(
+        results,
+        model_cfg,
+    )
 
 
 if __name__ == "__main__":

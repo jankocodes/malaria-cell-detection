@@ -5,6 +5,9 @@ from wrappers.base import BaseDetectionModel
 from torch.utils.data import DataLoader
 import numpy as np
 import random
+import os
+import json
+import matplotlib.pyplot as plt
 
 
 def train_one_epoch(
@@ -146,3 +149,47 @@ def set_random_seed(seed: int = 42, deterministic: bool = True):
     else:
         torch.backends.cudnn.deterministic = False
         torch.backends.cudnn.benchmark = True
+
+
+def save_and_plot_train_results(
+    results,
+    model_cfg,
+):
+    # Setup results directory
+    results_dir = os.path.join(
+        "results/train",
+        f"{'pretrained' if model_cfg['pretrained'] else 'from_scratch'}",
+    )
+    os.makedirs(results_dir, exist_ok=True)
+
+    # Save results to file
+    results_file = os.path.join(results_dir, f"{model_cfg['type']}_train_results.json")
+    with open(results_file, "w") as f:
+        json.dump(results, f, indent=2)
+    print(f"Training results saved to: {results_file}")
+
+    # Plot train and val loss per epoch
+    plots_dir = os.path.join(
+        "plots/train",
+        f"{'pretrained' if model_cfg['pretrained'] else 'from_scratch'}",
+    )
+    os.makedirs(plots_dir, exist_ok=True)
+
+    train_losses = results["train_loss"]
+    val_losses = results["val_loss"]
+    epochs = list(range(1, len(train_losses) + 1))
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(epochs, train_losses, label="Train Loss", marker="o")
+    plt.plot(epochs, val_losses, label="Val Loss", marker="o")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title(f"Training and Validation Loss - {model_cfg['type']}")
+    plt.legend()
+    plt.grid(True)
+    plt.xticks(epochs)
+
+    plot_file = os.path.join(plots_dir, f"{model_cfg['type']}_train_val_loss.png")
+    plt.savefig(plot_file)
+    plt.close()
+    print(f"Plot saved to: {plot_file}")
