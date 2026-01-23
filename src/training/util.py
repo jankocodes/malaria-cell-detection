@@ -108,11 +108,19 @@ def get_optimizer(
     lr: float,
 ) -> torch.optim.Optimizer:
     """Get the optimizer from the model type."""
-    if model_type in {ModelType.YOLOV5, ModelType.YOLOV8, ModelType.RETINANET}:
+    if model_type in {ModelType.YOLOV5, ModelType.YOLOV8}:
+        optimizer = torch.optim.SGD(
+            model.parameters(),
+            lr=lr,
+            weight_decay=5e-4,
+            momentum=0.9,
+        )
+    elif model_type == ModelType.RETINANET:
         optimizer = torch.optim.SGD(
             model.parameters(),
             lr=lr,
             weight_decay=1e-4,
+            momentum=0.9,
         )
     elif model_type == ModelType.DETR:
         optimizer = torch.optim.AdamW(
