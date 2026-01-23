@@ -155,10 +155,12 @@ def save_and_plot_train_results(
     results,
     model_cfg,
 ):
+    pretrained_str = "pretrained" if model_cfg["pretrained"] else "from_scratch"
+
     # Setup results directory
     results_dir = os.path.join(
         "results/train",
-        f"{'pretrained' if model_cfg['pretrained'] else 'from_scratch'}",
+        pretrained_str,
     )
     os.makedirs(results_dir, exist_ok=True)
 
@@ -168,10 +170,9 @@ def save_and_plot_train_results(
         json.dump(results, f, indent=2)
     print(f"Training results saved to: {results_file}")
 
-    # Plot train and val loss per epoch
     plots_dir = os.path.join(
         "plots/train",
-        f"{'pretrained' if model_cfg['pretrained'] else 'from_scratch'}",
+        pretrained_str,
     )
     os.makedirs(plots_dir, exist_ok=True)
 
@@ -184,12 +185,18 @@ def save_and_plot_train_results(
     plt.plot(epochs, val_losses, label="Val Loss", marker="o")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
-    plt.title(f"Training and Validation Loss - {model_cfg['type']}")
+    plt.title(f"Training and Validation Loss - {model_cfg['type']} ({pretrained_str})")
     plt.legend()
     plt.grid(True)
-    plt.xticks(epochs)
 
-    plot_file = os.path.join(plots_dir, f"{model_cfg['type']}_train_val_loss.png")
+    max_epoch = int(max(epochs))
+
+    xticks = [1]
+    xticks += list(range(5, max_epoch + 1, 5))
+
+    plt.xticks(xticks)
+
+    plot_file = os.path.join(plots_dir, f"test_train_val_loss.png")
     plt.savefig(plot_file)
     plt.close()
     print(f"Plot saved to: {plot_file}")
