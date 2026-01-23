@@ -162,6 +162,7 @@ def set_random_seed(seed: int = 42, deterministic: bool = True):
 def save_and_plot_train_results(
     results,
     model_cfg,
+    model_state_dict: torch.nn.Module = None,
 ):
     pretrained_str = "pretrained" if model_cfg["pretrained"] else "from_scratch"
 
@@ -177,6 +178,17 @@ def save_and_plot_train_results(
     with open(results_file, "w") as f:
         json.dump(results, f, indent=2)
     print(f"Training results saved to: {results_file}")
+
+    # Save model checkpoint if provided
+    if model_state_dict is not None:
+        checkpoints_dir = os.path.join(
+            "checkpoints",
+            pretrained_str,
+        )
+        os.makedirs(checkpoints_dir, exist_ok=True)
+        checkpoint_file = os.path.join(checkpoints_dir, f"{model_cfg['type']}_model.pt")
+        torch.save(model_state_dict, checkpoint_file)
+        print(f"Model checkpoint saved to: {checkpoint_file}")
 
     plots_dir = os.path.join(
         "plots/train",

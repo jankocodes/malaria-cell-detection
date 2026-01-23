@@ -21,4 +21,4 @@ slurm/
 src/models
 configs/
 results/
-sync.sh
+scripts/

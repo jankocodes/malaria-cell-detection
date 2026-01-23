@@ -55,6 +55,12 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
 
     results = {"train_loss": [], "val_loss": []}
 
+    # Early stopping setup
+    patience = 10
+    best_val_loss = float("inf")
+    epochs_no_improve = 0
+    best_model_state = None
+
     for epoch in range(num_epochs):
         result = train_one_epoch(
             model=model,
@@ -71,10 +77,25 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
         results["train_loss"].append(result.get("train_loss"))
         results["val_loss"].append(result.get("val_loss"))
 
+        # Early stopping logic
+        val_loss = result.get("val_loss")
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            epochs_no_improve = 0
+            best_model_state = model.state_dict()
+        else:
+            epochs_no_improve += 1
+            if epochs_no_improve >= patience:
+                print(
+                    f"Early stopping triggered after {epoch + 1} epochs (no improvement for {patience} epochs)"
+                )
+                break
+
     # --- Save Results as JSON ---
     save_and_plot_train_results(
         results,
         model_cfg,
+        model_state_dict=best_model_state,
     )
 
 
