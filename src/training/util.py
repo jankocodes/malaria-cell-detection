@@ -196,7 +196,7 @@ def save_and_plot_train_results(
 
     plt.xticks(xticks)
 
-    plot_file = os.path.join(plots_dir, f"test_train_val_loss.png")
+    plot_file = os.path.join(plots_dir, f"{model_cfg['type']}_train_val_loss.png")
     plt.savefig(plot_file)
     plt.close()
     print(f"Plot saved to: {plot_file}")
