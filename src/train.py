@@ -28,7 +28,7 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
 
     # --- Load Data ---
     print("Loading datasets...")
-    train_loader, val_loader = load_dataloaders(data_path, hyp)
+    train_loader, val_loader = load_train_val_loaders(data_path, hyp)
 
     # --- Optimizer ---
     lr = hyp.get("lr")
@@ -45,7 +45,7 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
 
     scheduler = OneCycleLR(
         optimizer,
-        max_lr=lr,
+        max_lr=[lr * 0.1, lr] if model_cfg["type"] == "detr" else lr,
         steps_per_epoch=steps_per_epoch,
         epochs=num_epochs,
     )
