@@ -8,6 +8,7 @@ import random
 import os
 import json
 import matplotlib.pyplot as plt
+import yaml
 
 
 def train_one_epoch(
@@ -17,7 +18,6 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler._LRScheduler,
     epoch,
-    show_progress=True,
 ):
     """
     Train and validate the model for one epoch.
@@ -33,8 +33,6 @@ def train_one_epoch(
         optimizer (torch.optim.Optimizer): Optimizer for updating model parameters.
         scheduler (torch.optim.lr_scheduler._LRScheduler): Learning rate scheduler.
         epoch (int): Current epoch number (0-indexed).
-        show_progress (bool, optional): If True, displays progress bars for training and validation.
-                                       Defaults to True.
 
     Returns:
         dict: Dictionary containing:
@@ -54,7 +52,8 @@ def train_one_epoch(
     total_train_loss = 0
 
     training_pbar = tqdm(
-        train_loader, desc=f"Training - Epoch {epoch +1}", disable=not show_progress
+        train_loader,
+        desc=f"Training - Epoch {epoch +1}",
     )
 
     for _, (images, targets) in enumerate(training_pbar):
@@ -93,7 +92,8 @@ def train_one_epoch(
         total_val_loss = 0
 
         val_pbar = tqdm(
-            val_loader, desc=f"Validation - Epoch {epoch +1}", disable=not show_progress
+            val_loader,
+            desc=f"Validation - Epoch {epoch +1}",
         )
 
         # validation
@@ -312,3 +312,21 @@ def save_and_plot_train_results(
     plt.savefig(plot_file)
     plt.close()
     print(f"Plot saved to: {plot_file}")
+
+
+def load_config(base_config, model_config, train_config=None):
+    with open(base_config, "r") as f:
+        base_cfg = yaml.safe_load(f)
+
+    with open(model_config, "r") as f:
+        model_cfg = yaml.safe_load(f)
+
+    if train_config is not None:
+        with open(train_config, "r") as f:
+            train_cfg = yaml.safe_load(f)
+    else:
+        train_cfg = {}
+
+    cfg = {"base": base_cfg, "model": model_cfg, "train": train_cfg}
+
+    return cfg

@@ -1,41 +1,27 @@
 import torch
 from torch.utils.data import DataLoader
-from data.dataset import BloodCellDataset
+from data.dataset import BloodCellDataset, DatasetType
 
 
-def load_dataloaders(data_path, hyp):
-    img_size = hyp.get("img_size", 640)  # Default to 640 if not specified
-    batch_size = hyp["batch_size"]
-    num_workers = hyp["num_workers"]
+def load_dataloader(
+    data_path: str, dataset_type: DatasetType, img_size, batch_size, num_workers
+):
 
-    train_dataset = BloodCellDataset(
-        annotations_file=f"{data_path}/train.json",
-        img_dir=f"{data_path}/train",
+    dataset = BloodCellDataset(
+        annotations_file=f"{data_path}/{dataset_type}.json",
+        img_dir=f"{data_path}/{dataset_type}",
         img_size=img_size,
     )
 
-    val_dataset = BloodCellDataset(
-        annotations_file=f"{data_path}/val.json",
-        img_dir=f"{data_path}/val",
-        img_size=img_size,
-    )
-
-    train_loader = DataLoader(
-        train_dataset,
+    test_loader = DataLoader(
+        dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=True if dataset_type == DatasetType.TRAIN else False,
         num_workers=num_workers,
         collate_fn=collate_fn,
     )
 
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        collate_fn=collate_fn,
-    )
-    return train_loader, val_loader
+    return test_loader
 
 
 def collate_fn(batch):
