@@ -1,9 +1,9 @@
 import torch
 from factory import ModelFactory
-from data.dataset import BloodCellDataset
+from data.dataset import BloodCellDataset, DatasetType
 from torch.utils.data import DataLoader
 from training.lr_finder import *
-from data.util import collate_fn
+from data.util import collate_fn, load_dataloader
 from training.util import *
 from factory import ModelType
 import argparse
@@ -35,18 +35,13 @@ def main(cfg, data_path=None, model_dir=None):
     # --- Load Data ---
     print("Loading datasets...")
     img_size = base_cfg.get("img_size", 640)  # Default to 640 if not specified
-    train_dataset = BloodCellDataset(
-        annotations_file=f"{data_path}/train.json",
-        img_dir=f"{data_path}/train",
-        img_size=img_size,
-    )
 
-    train_loader = DataLoader(
-        train_dataset,
+    train_loader = load_dataloader(
+        data_path,
+        dataset_type=DatasetType.TRAIN,
+        img_size=img_size,
         batch_size=model_cfg["batch_size"],
-        shuffle=True,
         num_workers=base_cfg["num_workers"],
-        collate_fn=collate_fn,
     )
 
     # --- Training Loop ---

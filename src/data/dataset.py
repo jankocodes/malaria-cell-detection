@@ -1,3 +1,4 @@
+from enum import Enum
 import os
 import json
 from torch.utils.data import Dataset
@@ -8,49 +9,10 @@ import numpy as np
 from copy import deepcopy
 
 
-def letterbox_transform(img, targets, img_size=640):
-    """
-    Apply letterbox transformation to image and adjust targets accordingly.
-
-    Args:
-        img: Input image (numpy array in BGR format)
-        targets: Dictionary containing bounding boxes in COCO format [x, y, w, h]
-        img_size: Target image size (default: 640)
-
-    Returns:
-        transformed_img: Transformed image tensor
-        transformed_targets: Targets with adjusted bounding boxes
-    """
-    # Store original image dimensions
-    original_h, original_w = img.shape[:2]
-
-    # 1️⃣ Resize and pad to model input using letterbox
-    # letterbox returns (image, ratio, (pad_w, pad_h))
-    img_letterboxed, ratio, (pad_w, pad_h) = letterbox(img, new_shape=img_size, stride=32)
-
-    # 2️⃣ Transform bounding boxes
-    if len(targets["bbox"]) > 0:
-        boxes = np.array(targets["bbox"], dtype=np.float32).copy()  # [x, y, w, h] format
-
-        # Scale boxes by the resize ratio
-        boxes[:, [0, 2]] *= ratio[0]  # Scale x and width
-        boxes[:, [1, 3]] *= ratio[1]  # Scale y and height
-
-        # Shift boxes by padding offsets
-        boxes[:, 0] += pad_w  # Shift x
-        boxes[:, 1] += pad_h  # Shift y
-
-        targets["bbox"] = boxes.tolist()
-
-    # 3️⃣ BGR -> RGB, HWC -> CHW
-    img_letterboxed = (
-        img_letterboxed[:, :, ::-1].transpose(2, 0, 1).copy()
-    )  # ⚠ make a copy to avoid negative strides
-
-    # 4️⃣ Convert to float tensor and scale 0-1
-    img_letterboxed = torch.from_numpy(img_letterboxed).float() / 255.0
-
-    return img_letterboxed, targets
+class DatasetType(str, Enum):
+    TRAIN = "train"
+    VAL = "val"
+    TEST = "test"
 
 
 class BloodCellDataset(Dataset):
@@ -144,3 +106,52 @@ class BloodCellDataset(Dataset):
         }
 
         return image, target
+
+
+def letterbox_transform(img, targets, img_size=640):
+    """
+    Apply letterbox transformation to image and adjust targets accordingly.
+
+    Args:
+        img: Input image (numpy array in BGR format)
+        targets: Dictionary containing bounding boxes in COCO format [x, y, w, h]
+        img_size: Target image size (default: 640)
+
+    Returns:
+        transformed_img: Transformed image tensor
+        transformed_targets: Targets with adjusted bounding boxes
+    """
+    # Store original image dimensions
+    original_h, original_w = img.shape[:2]
+
+    # 1️⃣ Resize and pad to model input using letterbox
+    # letterbox returns (image, ratio, (pad_w, pad_h))
+    img_letterboxed, ratio, (pad_w, pad_h) = letterbox(
+        img, new_shape=img_size, stride=32
+    )
+
+    # 2️⃣ Transform bounding boxes
+    if len(targets["bbox"]) > 0:
+        boxes = np.array(
+            targets["bbox"], dtype=np.float32
+        ).copy()  # [x, y, w, h] format
+
+        # Scale boxes by the resize ratio
+        boxes[:, [0, 2]] *= ratio[0]  # Scale x and width
+        boxes[:, [1, 3]] *= ratio[1]  # Scale y and height
+
+        # Shift boxes by padding offsets
+        boxes[:, 0] += pad_w  # Shift x
+        boxes[:, 1] += pad_h  # Shift y
+
+        targets["bbox"] = boxes.tolist()
+
+    # 3️⃣ BGR -> RGB, HWC -> CHW
+    img_letterboxed = (
+        img_letterboxed[:, :, ::-1].transpose(2, 0, 1).copy()
+    )  # ⚠ make a copy to avoid negative strides
+
+    # 4️⃣ Convert to float tensor and scale 0-1
+    img_letterboxed = torch.from_numpy(img_letterboxed).float() / 255.0
+
+    return img_letterboxed, targets

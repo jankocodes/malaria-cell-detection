@@ -5,6 +5,7 @@ from data.util import *
 from factory import ModelType
 import argparse
 from torch.optim.lr_scheduler import OneCycleLR
+from data.dataset import DatasetType
 
 
 def main(cfg, data_path=None, model_dir=None):
@@ -29,8 +30,17 @@ def main(cfg, data_path=None, model_dir=None):
 
     # --- Load Data ---
     print("Loading datasets...")
-    train_loader, val_loader = load_train_val_loaders(
+    train_loader = load_dataloader(
         data_path,
+        dataset_type=DatasetType.TRAIN,
+        img_size=base_cfg.get("img_size", 640),
+        batch_size=model_cfg["batch_size"],
+        num_workers=base_cfg["num_workers"],
+    )
+
+    val_loader = load_dataloader(
+        data_path,
+        dataset_type=DatasetType.VAL,
         img_size=base_cfg.get("img_size", 640),
         batch_size=model_cfg["batch_size"],
         num_workers=base_cfg["num_workers"],
