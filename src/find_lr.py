@@ -12,7 +12,7 @@ import os
 import json
 
 
-def main(cfg, data_path=None, show_progress=True, model_dir=None):
+def main(cfg, data_path=None, model_dir=None):
 
     set_random_seed(42)
 
@@ -72,7 +72,6 @@ def main(cfg, data_path=None, show_progress=True, model_dir=None):
         optimizer=optimizer,
         max_lr=max_lr,
         train_loader=train_loader,
-        show_progress=show_progress,
     )
 
     # --- Log Results ---
@@ -104,9 +103,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True, type=str, help="Path to config file")
     parser.add_argument("--data_path", type=str, help="Override dataset path")
-    parser.add_argument(
-        "--show_progress", type=bool, default=True, help="Override progress flag"
-    )
     parser.add_argument("--model_dir", type=str, help="Override model directory path")
 
     args = parser.parse_args()
@@ -117,6 +113,5 @@ if __name__ == "__main__":
     main(
         cfg,
         data_path=args.data_path,
-        show_progress=args.show_progress,
         model_dir=args.model_dir,
     )

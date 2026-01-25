@@ -19,7 +19,6 @@ def find_lr(
     optimizer: torch.optim.Optimizer,
     max_lr: float,
     train_loader: DataLoader,
-    show_progress: bool = True,
 ) -> FastaiLRFinder:
     # ---------------------------------------------------------
     def step_fn(engine, batch):
@@ -66,7 +65,7 @@ def find_lr(
     with lr_finder.attach(
         trainer, to_save=to_save, end_lr=max_lr
     ) as trainer_with_finder:
-        pbar = ProgressBar(disable=not show_progress)
+        pbar = ProgressBar()
         pbar.attach(trainer_with_finder)
 
         trainer_with_finder.run(train_loader)

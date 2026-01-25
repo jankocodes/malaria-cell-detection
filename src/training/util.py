@@ -17,7 +17,6 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler._LRScheduler,
     epoch,
-    show_progress=True,
 ):
     """
     Train and validate the model for one epoch.
@@ -33,8 +32,6 @@ def train_one_epoch(
         optimizer (torch.optim.Optimizer): Optimizer for updating model parameters.
         scheduler (torch.optim.lr_scheduler._LRScheduler): Learning rate scheduler.
         epoch (int): Current epoch number (0-indexed).
-        show_progress (bool, optional): If True, displays progress bars for training and validation.
-                                       Defaults to True.
 
     Returns:
         dict: Dictionary containing:
@@ -54,7 +51,8 @@ def train_one_epoch(
     total_train_loss = 0
 
     training_pbar = tqdm(
-        train_loader, desc=f"Training - Epoch {epoch +1}", disable=not show_progress
+        train_loader,
+        desc=f"Training - Epoch {epoch +1}",
     )
 
     for _, (images, targets) in enumerate(training_pbar):
@@ -93,7 +91,8 @@ def train_one_epoch(
         total_val_loss = 0
 
         val_pbar = tqdm(
-            val_loader, desc=f"Validation - Epoch {epoch +1}", disable=not show_progress
+            val_loader,
+            desc=f"Validation - Epoch {epoch +1}",
         )
 
         # validation
