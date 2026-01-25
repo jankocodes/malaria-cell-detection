@@ -170,18 +170,25 @@ def get_optimizer(
             momentum=0.9,
         )
     elif model_type == ModelType.DETR:
-        # Use separate learning rates for backbone and other components
         backbone_params = []
         other_params = []
 
-        for name, param in model.parameters_dict().items():
+        for name, param in model.model.named_parameters():
+            if not param.requires_grad:
+                continue
+
             if "backbone" in name:
                 backbone_params.append(param)
+                print(f"Backbone param: {name}")
             else:
                 other_params.append(param)
+                print(f"Other param: {name}")
+
+        assert len(backbone_params) > 0, "No backbone parameters found!"
+        assert len(other_params) > 0, "No non-backbone parameters found!"
 
         param_groups = [
-            {"params": backbone_params, "lr": lr * 0.1},  # Lower LR for backbone
+            {"params": backbone_params, "lr": lr * 0.1},
             {"params": other_params, "lr": lr},
         ]
 
@@ -189,6 +196,7 @@ def get_optimizer(
             param_groups,
             weight_decay=1e-4,
         )
+
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 
