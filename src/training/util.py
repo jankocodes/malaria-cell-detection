@@ -19,6 +19,34 @@ def train_one_epoch(
     epoch,
     show_progress=True,
 ):
+    """
+    Train and validate the model for one epoch.
+
+    Performs a complete training and validation cycle for the given epoch.
+    Trains the model on the training dataset, computes losses, performs backpropagation,
+    and updates model weights. Then validates on the validation dataset without gradient computation.
+
+    Args:
+        model (BaseDetectionModel): The detection model to train.
+        train_loader (DataLoader): DataLoader for the training dataset.
+        val_loader (DataLoader): DataLoader for the validation dataset.
+        optimizer (torch.optim.Optimizer): Optimizer for updating model parameters.
+        scheduler (torch.optim.lr_scheduler._LRScheduler): Learning rate scheduler.
+        epoch (int): Current epoch number (0-indexed).
+        show_progress (bool, optional): If True, displays progress bars for training and validation.
+                                       Defaults to True.
+
+    Returns:
+        dict: Dictionary containing:
+            - 'train_loss' (float): Average training loss across the epoch.
+            - 'val_loss' (float): Average validation loss across the epoch.
+
+    Side effects:
+        - Updates model weights during training.
+        - Updates learning rate scheduler.
+        - Prints learning rates for each parameter group after training.
+        - Prints epoch summary with train and validation losses.
+    """
     device = model.device
 
     # --- Training ---
@@ -29,7 +57,7 @@ def train_one_epoch(
         train_loader, desc=f"Training - Epoch {epoch +1}", disable=not show_progress
     )
 
-    for batch_idx, (images, targets) in enumerate(training_pbar):
+    for _, (images, targets) in enumerate(training_pbar):
         images = images.float().to(device)
 
         if len(targets) == 0:
@@ -69,7 +97,7 @@ def train_one_epoch(
         )
 
         # validation
-        for batch_idx, (images, targets) in enumerate(val_pbar):
+        for _, (images, targets) in enumerate(val_pbar):
             images = images.float().to(device)
 
             if len(targets) == 0:
@@ -107,7 +135,26 @@ def get_optimizer(
     model_type: ModelType,
     lr: float,
 ) -> torch.optim.Optimizer:
-    """Get the optimizer from the model type."""
+    """
+    Get the optimizer from the model type.
+
+    Selects and configures an appropriate optimizer based on the model architecture.
+    Different optimizers and hyperparameters are used for different model types:
+    - YOLO models use SGD with weight decay 5e-4
+    - RetinaNet uses SGD with weight decay 1e-4
+    - DETR uses AdamW with differential learning rates for backbone vs other components
+
+    Args:
+        model (BaseDetectionModel): The detection model instance.
+        model_type (ModelType): The type of the model (YOLOV5, YOLOV8, RETINANET, or DETR).
+        lr (float): Base learning rate for the optimizer.
+
+    Returns:
+        torch.optim.Optimizer: Configured optimizer for the model.
+
+    Raises:
+        ValueError: If the model type is not supported.
+    """
     if model_type in {ModelType.YOLOV5, ModelType.YOLOV8}:
         optimizer = torch.optim.SGD(
             model.parameters(),
@@ -123,9 +170,23 @@ def get_optimizer(
             momentum=0.9,
         )
     elif model_type == ModelType.DETR:
+        # Use separate learning rates for backbone and other components
+        backbone_params = []
+        other_params = []
+
+        for name, param in model.parameters_dict().items():
+            if "backbone" in name:
+                backbone_params.append(param)
+            else:
+                other_params.append(param)
+
+        param_groups = [
+            {"params": backbone_params, "lr": lr * 0.1},  # Lower LR for backbone
+            {"params": other_params, "lr": lr},
+        ]
+
         optimizer = torch.optim.AdamW(
-            model.parameters(),
-            lr=lr,
+            param_groups,
             weight_decay=1e-4,
         )
     else:
@@ -164,6 +225,29 @@ def save_and_plot_train_results(
     model_cfg,
     model_state_dict: torch.nn.Module = None,
 ):
+    """
+    Save training results and generate visualizations.
+
+    This function saves the training results to a JSON file, optionally saves the model checkpoint,
+    and generates a plot comparing training and validation losses across epochs.
+
+    Args:
+        results (dict): Dictionary containing 'train_loss' and 'val_loss' lists with loss values for each epoch.
+        model_cfg (dict): Model configuration dictionary containing 'type' and 'pretrained' keys.
+                         'type' is used for naming output files.
+                         'pretrained' is a boolean indicating if the model was pretrained.
+        model_state_dict (torch.nn.Module, optional): Model state dictionary to save as a checkpoint.
+                                                      If None, no checkpoint is saved. Defaults to None.
+
+    Returns:
+        None
+
+    Side effects:
+        - Creates and saves results JSON file to 'results/train/{pretrained|from_scratch}/'
+        - Creates and saves model checkpoint to 'checkpoints/{pretrained|from_scratch}/' if model_state_dict is provided
+        - Creates and saves training/validation loss plot to 'plots/train/{pretrained|from_scratch}/'
+        - Prints paths of saved files to console
+    """
     pretrained_str = "pretrained" if model_cfg["pretrained"] else "from_scratch"
 
     # Setup results directory
