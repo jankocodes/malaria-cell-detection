@@ -113,7 +113,7 @@ class ModelFactory:
 
     def load_yolov8(
         self,
-        pretrained: bool = True,
+        pretrained: bool = False,
         model_name: str = "yolov8s",
         model_dir: str = "models/yolov8",
     ) -> YOLOv8Wrapper:
@@ -167,7 +167,7 @@ class ModelFactory:
     def load_yolov5(
         self,
         repo_path: str = "ultralytics/yolov5",
-        pretrained: bool = True,
+        pretrained: bool = False,
         model_name: str = "yolov5s",
         model_dir: str = "models/yolov5",
         loss_yaml: str = "loss.yaml",
@@ -203,7 +203,7 @@ class ModelFactory:
 
     def load_retinanet(
         self,
-        pretrained=True,
+        pretrained: bool = False,
         weights=RetinaNet_ResNet50_FPN_Weights.DEFAULT,
     ) -> RetinaNetWrapper:
 
@@ -219,7 +219,7 @@ class ModelFactory:
 
     def load_detr(
         self,
-        pretrained=True,
+        pretrained: bool = False,
         weights="facebook/detr-resnet-50",
     ) -> DetrWrapper:
 
