@@ -4,42 +4,53 @@ from training.util import *
 from data.util import *
 from factory import ModelType
 import argparse
-import yaml
 from torch.optim.lr_scheduler import OneCycleLR
 
 
 def main(cfg, data_path=None, model_dir=None):
     set_random_seed(42)
 
-    hyp = cfg["hyp"]
+    # --- Configs ---
+    base_cfg = cfg["base"]
     model_cfg = cfg["model"]
-    data_path = data_path if data_path is not None else cfg["data_path"]
+    train_cfg = cfg["train"]
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
     # --- Load Model ---
-    factory = ModelFactory(device=device, num_classes=model_cfg["num_classes"])
+    factory = ModelFactory(device=device, num_classes=base_cfg["num_classes"])
+    model_type = ModelType(model_cfg["type"])
     model = factory.load(
-        model_type=ModelType(model_cfg["type"]),
-        pretrained=model_cfg["pretrained"],
+        model_type=model_type,
+        pretrained=train_cfg["pretrained"],
         model_dir=model_dir,
     )
 
     # --- Load Data ---
     print("Loading datasets...")
-    train_loader, val_loader = load_train_val_loaders(data_path, hyp)
+    train_loader, val_loader = load_train_val_loaders(
+        data_path,
+        img_size=base_cfg.get("img_size", 640),
+        batch_size=model_cfg["batch_size"],
+        num_workers=base_cfg["num_workers"],
+    )
 
     # --- Optimizer ---
-    lr = hyp.get("lr")
+    lr = (
+        model_cfg["pretrained_lr"]
+        if train_cfg["pretrained"]
+        else model_cfg["from_scratch_lr"]
+    )
+
     optimizer = get_optimizer(
         model=model,
-        model_type=ModelType(model_cfg["type"]),
+        model_type=model_type,
         lr=lr,
     )
 
     # --- LR Scheduler ---
-    num_epochs = hyp["num_epochs"]
+    num_epochs = train_cfg["num_epochs"]
 
     steps_per_epoch = len(train_loader)
 
@@ -100,14 +111,25 @@ def main(cfg, data_path=None, model_dir=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", required=True, type=str, help="Path to config file")
+    parser.add_argument(
+        "--base_config", required=True, type=str, help="Path to base config file"
+    )
+    parser.add_argument(
+        "--model_config", required=True, type=str, help="Path to model config file"
+    )
+    parser.add_argument(
+        "--train_config", required=True, type=str, help="Path to train config file"
+    )
     parser.add_argument("--data_path", type=str, help="Override dataset path")
     parser.add_argument("--model_dir", type=str, help="Override model directory path")
 
     args = parser.parse_args()
 
-    with open(args.config, "r") as f:
-        cfg = yaml.safe_load(f)
+    cfg = load_config(
+        base_config=args.base_config,
+        model_config=args.model_config,
+        train_config=args.train_config,
+    )
 
     main(
         cfg,

@@ -3,11 +3,7 @@ from torch.utils.data import DataLoader
 from data.dataset import BloodCellDataset
 
 
-def load_dataloaders(data_path, hyp):
-    img_size = hyp.get("img_size", 640)  # Default to 640 if not specified
-    batch_size = hyp["batch_size"]
-    num_workers = hyp["num_workers"]
-
+def load_train_val_loaders(data_path, img_size, batch_size, num_workers):
     train_dataset = BloodCellDataset(
         annotations_file=f"{data_path}/train.json",
         img_dir=f"{data_path}/train",
