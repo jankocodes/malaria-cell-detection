@@ -8,8 +8,8 @@ def load_dataloader(
 ):
 
     dataset = BloodCellDataset(
-        annotations_file=f"{data_path}/{dataset_type}.json",
-        img_dir=f"{data_path}/{dataset_type}",
+        annotations_file=f"{data_path}/{dataset_type.value}.json",
+        img_dir=f"{data_path}/{dataset_type.value}",
         img_size=img_size,
     )
 
