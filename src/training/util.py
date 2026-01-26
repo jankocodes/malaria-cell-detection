@@ -230,7 +230,7 @@ def set_random_seed(seed: int = 42, deterministic: bool = True):
 
 def save_and_plot_train_results(
     results,
-    model_cfg,
+    cfg: dict,
     model_state_dict: torch.nn.Module = None,
 ):
     """
@@ -256,7 +256,10 @@ def save_and_plot_train_results(
         - Creates and saves training/validation loss plot to 'plots/train/{pretrained|from_scratch}/'
         - Prints paths of saved files to console
     """
-    pretrained_str = "pretrained" if model_cfg["pretrained"] else "from_scratch"
+    model_cfg = cfg["model"]
+    train_cfg = cfg["train"]
+
+    pretrained_str = "pretrained" if train_cfg["pretrained"] else "from_scratch"
 
     # Setup results directory
     results_dir = os.path.join(

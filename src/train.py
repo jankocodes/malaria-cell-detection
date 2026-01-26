@@ -114,7 +114,7 @@ def main(cfg, data_path=None, model_dir=None):
     # --- Save Results as JSON ---
     save_and_plot_train_results(
         results,
-        model_cfg,
+        cfg,
         model_state_dict=best_model_state,
     )
 
