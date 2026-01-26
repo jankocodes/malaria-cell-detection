@@ -30,6 +30,7 @@ def main(cfg, data_path=None, model_dir=None):
         model_type=ModelType(model_type_str),
         pretrained=train_cfg["pretrained"],
         model_dir=model_dir,
+        num_queries=model_cfg.get("num_queries", 400),
     )
 
     # --- Load Data ---
