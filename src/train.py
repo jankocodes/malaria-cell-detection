@@ -77,7 +77,7 @@ def main(cfg, data_path=None, model_dir=None):
     results = {"train_loss": [], "val_loss": []}
 
     # Early stopping setup
-    patience = 10
+    patience = train_cfg["patience"]
     best_val_loss = float("inf")
     epochs_no_improve = 0
     best_model_state = None
