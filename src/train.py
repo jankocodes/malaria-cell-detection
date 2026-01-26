@@ -57,6 +57,7 @@ def main(cfg, data_path=None, model_dir=None):
         model=model,
         model_type=model_type,
         lr=lr,
+        seperate_backbone_lr=model_cfg.get("seperate_backbone_lr", False),
     )
 
     # --- LR Scheduler ---

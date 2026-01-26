@@ -134,6 +134,7 @@ def get_optimizer(
     model: BaseDetectionModel,
     model_type: ModelType,
     lr: float,
+    seperate_backbone_lr: bool = False,
 ) -> torch.optim.Optimizer:
     """
     Get the optimizer from the model type.
@@ -170,27 +171,12 @@ def get_optimizer(
             momentum=0.9,
         )
     elif model_type == ModelType.DETR:
-        backbone_params = []
-        other_params = []
 
-        for name, param in model.model.named_parameters():
-            if not param.requires_grad:
-                continue
-
-            if "backbone" in name:
-                backbone_params.append(param)
-                print(f"Backbone param: {name}")
-            else:
-                other_params.append(param)
-                print(f"Other param: {name}")
-
-        assert len(backbone_params) > 0, "No backbone parameters found!"
-        assert len(other_params) > 0, "No non-backbone parameters found!"
-
-        param_groups = [
-            {"params": backbone_params, "lr": lr * 0.1},
-            {"params": other_params, "lr": lr},
-        ]
+        param_groups = (
+            get_seperate_backbone_lr(model, lr)
+            if seperate_backbone_lr
+            else model.parameters()
+        )
 
         optimizer = torch.optim.AdamW(
             param_groups,
@@ -203,6 +189,28 @@ def get_optimizer(
     print(f"Using optimizer: {optimizer}")
 
     return optimizer
+
+
+def get_seperate_backbone_lr(model, lr: float):
+    backbone_params = []
+    other_params = []
+
+    for name, param in model.model.named_parameters():
+        if not param.requires_grad:
+            continue
+
+        if "backbone" in name:
+            backbone_params.append(param)
+            print(f"Backbone param: {name}")
+        else:
+            other_params.append(param)
+            print(f"Other param: {name}")
+
+    param_groups = [
+        {"params": backbone_params, "lr": lr * 0.1},
+        {"params": other_params, "lr": lr},
+    ]
+    return param_groups
 
 
 def set_random_seed(seed: int = 42, deterministic: bool = True):
