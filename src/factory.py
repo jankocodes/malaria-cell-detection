@@ -83,6 +83,7 @@ class ModelFactory:
         self,
         model_type: ModelType,
         model_dir: str = None,
+        num_queries: int = 400,
         **kwargs: Any,
     ) -> BaseDetectionModel:
         """
@@ -105,7 +106,7 @@ class ModelFactory:
             return self.load_retinanet(**kwargs)
 
         elif model_type == ModelType.DETR:
-            return self.load_detr(**kwargs)
+            return self.load_detr(num_queries=num_queries, **kwargs)
 
         else:
             # This should never happen, but is nice for defensive programming
@@ -221,10 +222,12 @@ class ModelFactory:
         self,
         pretrained: bool = False,
         weights="facebook/detr-resnet-50",
+        num_queries: int = 400,
     ) -> DetrWrapper:
 
         if pretrained:
             config = DetrConfig.from_pretrained(weights)
+            config.num_queries = num_queries
             config.num_labels = self.num_classes
             model = DetrForObjectDetection.from_pretrained(
                 weights, config=config, ignore_mismatched_sizes=True
@@ -234,6 +237,7 @@ class ModelFactory:
                 config=DetrConfig(
                     use_pretrained_backbone=False,
                     num_labels=self.num_classes,
+                    num_queries=num_queries,
                 )
             )
         return DetrWrapper(
