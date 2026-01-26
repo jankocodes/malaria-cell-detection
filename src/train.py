@@ -53,11 +53,12 @@ def main(cfg, data_path=None, model_dir=None):
         else model_cfg["from_scratch_lr"]
     )
 
+    seperate_backbone_lr = model_cfg.get("seperate_backbone_lr", False)
     optimizer = get_optimizer(
         model=model,
         model_type=model_type,
         lr=lr,
-        seperate_backbone_lr=model_cfg.get("seperate_backbone_lr", False),
+        seperate_backbone_lr=seperate_backbone_lr,
     )
 
     # --- LR Scheduler ---
@@ -67,7 +68,7 @@ def main(cfg, data_path=None, model_dir=None):
 
     scheduler = OneCycleLR(
         optimizer,
-        max_lr=[lr * 0.1, lr] if model_cfg["type"] == "detr" else lr,
+        max_lr=[lr * 0.1, lr] if seperate_backbone_lr else lr,
         steps_per_epoch=steps_per_epoch,
         epochs=num_epochs,
     )
