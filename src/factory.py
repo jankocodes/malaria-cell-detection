@@ -229,11 +229,11 @@ class ModelFactory:
             config = DetrConfig.from_pretrained(weights)
             config.num_queries = num_queries
             config.num_labels = self.num_classes
+            config.auxiliary_loss = True  # ✅ stronger gradients
             model = DetrForObjectDetection.from_pretrained(
                 weights,
                 config=config,
                 ignore_mismatched_sizes=True,
-                aux_loss=True,  # ✅ stronger gradients
             )
         else:
             model = DetrForObjectDetection(
