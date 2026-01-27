@@ -1,23 +1,24 @@
 import torch
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 from factory import ModelFactory, ModelType
 from data.util import *
 from training.util import set_random_seed
 from evaluation.metrics import calculate_ap
+from evaluation.util import save_ap_results
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-PRETRAINED = True
-MODEL_TYPE = ModelType.YOLOV5
+PRETRAINED = False
+MODEL_TYPE = ModelType.YOLOV8
 DATASET_TYPE = DatasetType.TEST
 PRETRAINED_STR = "pretrained" if PRETRAINED else "from_scratch"
 DATA_PATH = "data/preprocessed/vogelbacher23"
 BATCH_SIZE = 16
 NUM_WORKERS = 0
 NUM_CLASSES = 7
+PROCESS_ALL = True  # If False, process only one batch for quick evaluation
 
-if __name__ == "__main__":
+
+def main():
     set_random_seed(42)
 
     # 1. Load Model
@@ -45,40 +46,40 @@ if __name__ == "__main__":
         img_size=640,
     )
 
-    print(f"✅ Loaded test data: {len(test_loader)} batches")
-
     # 4. Run evaluation on entire test set
     all_predictions = []
     all_targets = []
 
     print("\nRunning inference on test set...")
     with torch.no_grad():
-        # for batch_idx, (images, targets) in enumerate(test_loader):
-        #     images = images.to(DEVICE)
-        #     targets = [{k: v.to(DEVICE) for k, v in t.items()} for t in targets]
+        if PROCESS_ALL:
+            print(f"✅ Loaded test data: {len(test_loader)} batches")
 
-        #     # Get predictions
-        #     out = model(images)
-        #     predictions = out["predictions"]
+            for batch_idx, (images, targets) in enumerate(test_loader):
+                images = images.to(DEVICE)
+                targets = [{k: v.to(DEVICE) for k, v in t.items()} for t in targets]
 
-        #     # Store predictions and targets
-        #     all_predictions.extend(predictions)
-        #     all_targets.extend(targets)
+                # Get predictions
+                out = model(images)
+                predictions = out["predictions"]
 
-        #     if (batch_idx + 1) % 10 == 0:
-        #         print(f"  Processed batch {batch_idx + 1}/{len(test_loader)}")
-        images, targets = next(iter(test_loader))
-        images = images.to(DEVICE)
-        targets = [{k: v.to(DEVICE) for k, v in t.items()} for t in targets]
+                # Store predictions and targets
+                all_predictions.extend(predictions)
+                all_targets.extend(targets)
 
-        # Get predictions
-        out = model(images)
-        predictions = out["predictions"]
+                print(f"  Processed batch {batch_idx + 1}/{len(test_loader)}")
+        else:
+            images, targets = next(iter(test_loader))
+            images = images.to(DEVICE)
+            targets = [{k: v.to(DEVICE) for k, v in t.items()} for t in targets]
+            # Get predictions
+            out = model(images)
+            predictions = out["predictions"]
+            # Store predictions and targets
+            all_predictions.extend(predictions)
+            all_targets.extend(targets)
 
-        # Store predictions and targets
-        all_predictions.extend(predictions)
-        all_targets.extend(targets)
-
+    print(f"Unique labels in ground truth: {get_unique_labels(all_targets)}")
     print(f"✅ Inference completed on {len(all_predictions)} images.")
 
     # 5. Calculate AP metrics at IoU=0.5 (AP50)
@@ -90,6 +91,14 @@ if __name__ == "__main__":
         iou_threshold=0.5,
     )
 
+    save_ap_results(
+        metrics=metrics,
+        model_type=MODEL_TYPE,
+        pretrained_str=PRETRAINED_STR,
+        data_path=DATA_PATH,
+        num_img=len(all_predictions),
+        num_classes=NUM_CLASSES,
+    )
     # 6. Display results
     print("\n" + "=" * 50)
     print("EVALUATION RESULTS")
@@ -105,7 +114,11 @@ if __name__ == "__main__":
     for i in range(NUM_CLASSES):
         ap_value = metrics[f"AP_class_{i}"]
         if not np.isnan(ap_value):
-            print(f"  Class {i}: {ap_value:.4f}")
+            print(f"  Class {i+1}: {ap_value:.4f}")
         else:
-            print(f"  Class {i}: N/A (no ground truth)")
+            print(f"  Class {i+1}: N/A (no ground truth)")
     print("=" * 50)
+
+
+if __name__ == "__main__":
+    main()
