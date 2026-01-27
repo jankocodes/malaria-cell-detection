@@ -230,7 +230,10 @@ class ModelFactory:
             config.num_queries = num_queries
             config.num_labels = self.num_classes
             model = DetrForObjectDetection.from_pretrained(
-                weights, config=config, ignore_mismatched_sizes=True
+                weights,
+                config=config,
+                ignore_mismatched_sizes=True,
+                aux_loss=True,  # ✅ stronger gradients
             )
         else:
             model = DetrForObjectDetection(
@@ -238,6 +241,7 @@ class ModelFactory:
                     use_pretrained_backbone=False,
                     num_labels=self.num_classes,
                     num_queries=num_queries,
+                    aux_loss=True,  # ✅ stronger gradients
                 )
             )
         return DetrWrapper(
