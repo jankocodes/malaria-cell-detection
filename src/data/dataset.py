@@ -102,8 +102,6 @@ class BloodCellDataset(Dataset):
                 dtype=torch.int64,
             ),
             "image_id": torch.tensor([img_id]),
-            "area": torch.as_tensor(target["area"], dtype=torch.float32),
-            "iscrowd": torch.as_tensor(target["iscrowd"], dtype=torch.int64),
         }
 
         return image, target
