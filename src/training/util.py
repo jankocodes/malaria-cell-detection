@@ -172,13 +172,10 @@ def get_optimizer(
         )
     elif model_type == ModelType.DETR:
 
-        param_groups = (
-            (
-                get_seperate_backbone_lr(model, lr)
-                if seperate_backbone_lr
-                else {"params": model.parameters(), "lr": lr}
-            ),
-        )
+        if seperate_backbone_lr:
+            param_groups = get_seperate_backbone_lr(model, lr)
+        else:
+            param_groups = [{"params": model.parameters(), "lr": lr}]
 
         optimizer = torch.optim.AdamW(
             param_groups,
