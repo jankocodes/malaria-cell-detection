@@ -264,13 +264,22 @@ def calculate_ap(
                     all_scores.append(scores)
 
         # Compute AP for this class
-        if len(all_matches) > 0:
+        # Compute AP for this class
+        num_gt = all_gt_counts[c]
+
+        # No ground truth → AP undefined (will be ignored in mAP)
+        if num_gt == 0:
+            ap = float("nan")
+
+        # Ground truth exists but no predictions → AP = 0
+        elif len(all_matches) == 0:
+            ap = 0.0
+
+        # Normal case
+        else:
             matches_class = np.concatenate(all_matches)
             scores_class = np.concatenate(all_scores)
-            ap = compute_ap(matches_class, scores_class, all_gt_counts[c])
-        else:
-            # No predictions for this class
-            ap = 0.0 if all_gt_counts[c] > 0 else float("nan")
+            ap = compute_ap(matches_class, scores_class, num_gt)
 
         ap_per_class[f"AP_class_{c}"] = ap
 
