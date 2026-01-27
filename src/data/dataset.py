@@ -78,8 +78,9 @@ class BloodCellDataset(Dataset):
             self.unique_labels.add(annotation["category_id"])
 
         # Create class_id mapping
-        for i, label in enumerate(self.unique_labels):
-            self.label_mapping[label] = i
+        for label in self.unique_labels:
+            self.label_mapping[label] = label - 1
+        print(self.label_mapping)
 
     def __len__(self):
         return len(self.images)
@@ -106,6 +107,9 @@ class BloodCellDataset(Dataset):
         }
 
         return image, target
+
+
+from yolov5.utils.augmentations import letterbox
 
 
 def letterbox_transform(img, targets, img_size=640):
