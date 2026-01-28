@@ -141,7 +141,12 @@ class YOLOv5Wrapper(BaseDetectionModel):
             "loss": loss,
         }
 
-    def _forward_eval(self, images: torch.Tensor) -> dict:
+    def _forward_eval(
+        self,
+        images: torch.Tensor,
+        iou_thresh=0.5,
+        conf_thresh=0.005,
+    ) -> dict:
         """
         Forward pass for evaluation — returns final detections.
         """
@@ -150,8 +155,8 @@ class YOLOv5Wrapper(BaseDetectionModel):
 
             pred = non_max_suppression(
                 pred,
-                conf_thres=0.005,
-                iou_thres=0.5,
+                conf_thres=conf_thresh,
+                iou_thres=iou_thresh,
             )
 
         outputs = []
@@ -208,6 +213,33 @@ class YOLOv5Wrapper(BaseDetectionModel):
 
         # Return structured loss dict
         return loss, loss_items
+
+    def predict(
+        self,
+        images: torch.Tensor,
+        iou_thresh=0.5,
+        conf_thresh=0.005,
+    ) -> dict:
+        """
+        Run inference to obtain final detections.
+
+        Args:
+            images (torch.Tensor): Batch of input images, shape [B, 3, H, W].
+            iou_thresh (float): IoU threshold for NMS.
+            conf_thresh (float): Confidence threshold for filtering boxes.
+
+        Returns:
+            Dict with:
+            'predictions' : List of dicts per image with:
+                - 'boxes': Tensor [N, 4] in xyxy pixel coords
+                - 'scores': Tensor [N] confidence scores
+                - 'labels': Tensor [N] class indices
+        """
+        return self._forward_eval(
+            images,
+            iou_thresh=iou_thresh,
+            conf_thresh=conf_thresh,
+        )
 
     def _convert_targets_to_yolov5_format(self, targets, img_size):
         """

@@ -60,6 +60,21 @@ class YOLOv8Wrapper(BaseDetectionModel):
 
         print(f"✅ Updated YOLOv8 model to {num_classes} classes )")
 
+    def predict(self, images: torch.Tensor, conf_thresh=0.5, iou_thresh=0.5):
+        """
+        Inference / prediction method for YOLOv8.
+
+        Args:
+            images: Input image tensor of shape (B, C, H, W)
+            conf_thresh: Confidence threshold for NMS
+            iou_thresh: IoU threshold for NMS
+        Returns:
+            List of dicts per image with keys 'boxes', 'scores', 'labels'.
+        """
+        return self._forward_eval(
+            images, conf_thresh=conf_thresh, iou_thresh=iou_thresh
+        )
+
     def _forward_train(
         self, images: torch.Tensor, targets: List[Dict[str, torch.Tensor]]
     ) -> Dict[str, torch.Tensor]:
@@ -79,7 +94,7 @@ class YOLOv8Wrapper(BaseDetectionModel):
         return {"loss": total_loss, "loss_items": loss_items}
 
     def _forward_eval(
-        self, images: torch.Tensor
+        self, images: torch.Tensor, conf_thresh=0.5, iou_thresh=0.5
     ) -> Dict[str, List[Dict[str, torch.Tensor]]]:
         """
         Evaluation forward pass for YOLOv8 DetectionModel.
@@ -90,8 +105,8 @@ class YOLOv8Wrapper(BaseDetectionModel):
 
             preds = non_max_suppression(
                 preds,
-                conf_thres=0.005,
-                iou_thres=0.5,
+                conf_thres=conf_thresh,
+                iou_thres=iou_thresh,
                 multi_label=False,
                 agnostic=False,
                 max_det=300,

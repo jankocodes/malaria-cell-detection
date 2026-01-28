@@ -90,6 +90,48 @@ class RetinaNetWrapper(BaseDetectionModel):
 
         print(f"✅ Updated model to {num_classes} classes")
 
+    def predict(self, images: torch.Tensor, conf_thresh=0.5, iou_thresh=0.5):
+        """
+        Run inference and post-process outputs.
+
+        Args:
+            images (torch.Tensor): Batch of input images, shape [B, 3, H, W].
+            conf_thresh (float): Confidence threshold for filtering boxes.
+            iou_thresh (float): IoU threshold for NMS.
+
+        Returns:
+            List of dicts per image with keys 'boxes', 'scores', 'labels'.
+        """
+        self.model.eval()
+        with torch.no_grad():
+            outputs = self.model(images)
+
+        processed_outputs = []
+        for output in outputs:
+            boxes = output["boxes"]
+            scores = output["scores"]
+            labels = output["labels"]
+
+            # Filter by confidence threshold
+            keep = scores >= conf_thresh
+            boxes = boxes[keep]
+            scores = scores[keep]
+            labels = labels[keep]
+
+            # Apply NMS
+            keep_indices = torch.ops.torchvision.nms(boxes, scores, iou_thresh)
+            boxes = boxes[keep_indices]
+            scores = scores[keep_indices]
+            labels = labels[keep_indices]
+
+            processed_outputs.append(
+                {"boxes": boxes, "scores": scores, "labels": labels}
+            )
+
+        return {
+            "predictions": processed_outputs,
+        }
+
     def _forward_eval(self, images: torch.Tensor) -> Dict[str, List[torch.Tensor]]:
         """
         Forward pass for evaluation — returns processed predictions.

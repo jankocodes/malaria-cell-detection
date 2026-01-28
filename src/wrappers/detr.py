@@ -79,6 +79,20 @@ class DetrWrapper(BaseDetectionModel):
 
         print(f"✅ Updated model to {num_classes} classes")
 
+    def predict(self, images: torch.Tensor, conf_thresh=0.5, iou_thresh=0.5):
+        """
+        Run inference and post-process outputs.
+
+        Args:
+            images (torch.Tensor): Batch of input images, shape [B, 3, H, W].
+            conf_thresh (float): Confidence threshold for filtering boxes.
+            iou_thresh (float): IoU threshold for NMS.
+
+        Returns:
+            List of dicts per image with keys 'boxes', 'scores', 'labels'.
+        """
+        return self._forward_eval(images, conf_thresh=conf_thresh)
+
     def _forward_train(self, images: torch.Tensor, targets=None) -> dict:
         """
         Unified DETR forward pass that uses DETR's internal loss during training.
@@ -140,7 +154,11 @@ class DetrWrapper(BaseDetectionModel):
 
         return detr_targets
 
-    def _forward_eval(self, images: torch.Tensor) -> Dict[str, Any]:
+    def _forward_eval(
+        self,
+        images: torch.Tensor,
+        conf_thresh=0.0,
+    ) -> Dict[str, Any]:
         """
         Evaluation forward pass for DETR with post-processing.
 
@@ -171,8 +189,6 @@ class DetrWrapper(BaseDetectionModel):
         boxes_xyxy = boxes_xyxy * scale
 
         outputs_pp: List[Dict[str, torch.Tensor]] = []
-
-        conf_thresh = 0.25  # keep consistent with YOLO
 
         for b in range(B):
             keep = scores[b] > conf_thresh
