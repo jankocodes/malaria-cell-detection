@@ -150,8 +150,8 @@ class YOLOv5Wrapper(BaseDetectionModel):
 
             pred = non_max_suppression(
                 pred,
-                conf_thres=0.25,
-                iou_thres=0.45,
+                conf_thres=0.005,
+                iou_thres=0.5,
             )
 
         outputs = []

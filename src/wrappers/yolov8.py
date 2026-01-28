@@ -90,8 +90,8 @@ class YOLOv8Wrapper(BaseDetectionModel):
 
             preds = non_max_suppression(
                 preds,
-                conf_thres=0.0,
-                iou_thres=0.45,
+                conf_thres=0.005,
+                iou_thres=0.5,
                 multi_label=False,
                 agnostic=False,
                 max_det=300,
