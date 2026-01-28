@@ -73,6 +73,8 @@ class BloodCellDataset(Dataset):
 
             # Append annotation details to the corresponding image_id
             for cat in self.annotation_categories:
+                if cat == "area" or cat == "iscrowd":
+                    continue  # Skip area and iscrowd
                 self.target[image_id][cat].append(annotation[cat])
 
             self.unique_labels.add(annotation["category_id"])
