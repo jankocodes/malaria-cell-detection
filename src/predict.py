@@ -9,13 +9,13 @@ from evaluation.util import visualize_predictions
 # -------------------------
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 PRETRAINED = True
-MODEL_TYPE = ModelType.YOLOV5
+MODEL_TYPE = ModelType.RETINANET
 EXT = False
 BATCH_SIZE = 1
 NUM_WORKERS = 0
 IMG_SIZE = 640
 NUM_QUERIES = 300
-CONF_THRESH = 0.5
+CONF_THRESH = 0.05
 IOU_THRESH = 0.45
 NUM_CLASSES = 7
 
@@ -42,7 +42,7 @@ def main():
     dataset = "avian_malaria" if EXT else "vogelbacher23"
     data_path = "data/preprocessed/" + dataset
     test_loader = load_dataloader(
-        dataset_type=DatasetType.TEST,
+        dataset_type=DatasetType.EXT if EXT else DatasetType.TEST,
         data_path=data_path,
         batch_size=BATCH_SIZE,
         num_workers=NUM_WORKERS,
@@ -66,7 +66,7 @@ def main():
     for i, (image, prediction, target) in enumerate(
         zip(images, out["predictions"], targets)
     ):
-        visualize_predictions(image, prediction)
+        visualize_predictions(image, prediction, target)
         print(f"✅ Saved prediction visualization for image {i}.")
 
 

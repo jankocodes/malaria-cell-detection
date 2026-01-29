@@ -13,6 +13,7 @@ class DatasetType(str, Enum):
     TRAIN = "train"
     VAL = "val"
     TEST = "test"
+    EXT = "ext"
 
 
 class BloodCellDataset(Dataset):
@@ -59,8 +60,7 @@ class BloodCellDataset(Dataset):
         self.target = dict()
         self.annotation_categories = {"bbox", "category_id", "iscrowd", "area"}
         self.unique_labels = set()
-        self.label_mapping = dict()
-
+        self.label_mapping = {}
         # Create a mapping from image_id to its annotations
         for annotation in self.annotations["annotations"]:
             image_id = annotation["image_id"]

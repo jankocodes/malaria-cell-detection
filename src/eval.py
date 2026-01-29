@@ -7,15 +7,13 @@ from evaluation.metrics import calculate_ap
 from evaluation.util import save_ap_results
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-PRETRAINED = False
-MODEL_TYPE = ModelType.YOLOV8
-DATASET_TYPE = DatasetType.TEST
-PRETRAINED_STR = "pretrained" if PRETRAINED else "from_scratch"
-DATA_PATH = "data/preprocessed/vogelbacher23"
-BATCH_SIZE = 16
-NUM_WORKERS = 0
+PRETRAINED = True
+MODEL_TYPE = ModelType.RETINANET
+EXT = False
+BATCH_SIZE = 1
 NUM_CLASSES = 7
-PROCESS_ALL = True  # If False, process only one batch for quick evaluation
+PROCESS_ALL = False  # If False, process only one batch for quick evaluation
+AP_IOU_THRESH = 0.34
 
 
 def main():
@@ -29,20 +27,23 @@ def main():
     )
 
     # 2. Load weights
+    pretrained_str = "pretrained" if PRETRAINED else "from_scratch"
     ckpt = torch.load(
-        f"checkpoints/{PRETRAINED_STR}/{MODEL_TYPE}_model.pt", map_location=DEVICE
+        f"checkpoints/{pretrained_str}/{MODEL_TYPE}_model.pt", map_location=DEVICE
     )
     model.load_state_dict(ckpt)
     model.eval()
 
-    print(f"✅ Loaded {MODEL_TYPE} model ({PRETRAINED_STR}) for evaluation.")
+    print(f"✅ Loaded {MODEL_TYPE} model ({pretrained_str}) for evaluation.")
 
     # 3. Load test data
+    dataset = "avian_malaria" if EXT else "vogelbacher23"
+    data_path = "data/preprocessed/" + dataset
     test_loader = load_dataloader(
-        dataset_type=DATASET_TYPE,
-        data_path=DATA_PATH,
+        dataset_type=DatasetType.EXT if EXT else DatasetType.TEST,
+        data_path=data_path,
         batch_size=BATCH_SIZE,
-        num_workers=NUM_WORKERS,
+        num_workers=0,
         img_size=640,
     )
 
@@ -79,7 +80,6 @@ def main():
             all_predictions.extend(predictions)
             all_targets.extend(targets)
 
-    print(f"Unique labels in ground truth: {get_unique_labels(all_targets)}")
     print(f"✅ Inference completed on {len(all_predictions)} images.")
 
     # 5. Calculate AP metrics at IoU=0.5 (AP50)
@@ -88,27 +88,29 @@ def main():
         predictions=all_predictions,
         targets=all_targets,
         num_classes=NUM_CLASSES,
-        iou_threshold=0.5,
+        iou_threshold=AP_IOU_THRESH,
     )
 
-    save_ap_results(
-        metrics=metrics,
-        model_type=MODEL_TYPE,
-        pretrained_str=PRETRAINED_STR,
-        data_path=DATA_PATH,
-        num_img=len(all_predictions),
-        num_classes=NUM_CLASSES,
-    )
+    if PROCESS_ALL:
+        save_ap_results(
+            metrics=metrics,
+            model_type=MODEL_TYPE,
+            pretrained_str=pretrained_str,
+            data_path=data_path,
+            num_img=len(all_predictions),
+            num_classes=NUM_CLASSES,
+        )
+
     # 6. Display results
     print("\n" + "=" * 50)
     print("EVALUATION RESULTS")
     print("=" * 50)
-    print(f"Model: {MODEL_TYPE} ({PRETRAINED_STR})")
-    print(f"Dataset: {DATA_PATH}")
+    print(f"Model: {MODEL_TYPE} ({pretrained_str})")
+    print(f"Dataset: {data_path}")
     print(f"Num Images: {len(all_predictions)}")
-    print(f"IoU Threshold: 0.5")
+    print(f"IoU Threshold: {AP_IOU_THRESH}")
     print("-" * 50)
-    print(f"mAP@0.5: {metrics['mAP']:.4f}")
+    print(f"mAP@{AP_IOU_THRESH}: {metrics['mAP']:.4f}")
     print("-" * 50)
     print("Per-class AP:")
     for i in range(NUM_CLASSES):
