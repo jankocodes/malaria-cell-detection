@@ -130,7 +130,7 @@ class ModelFactory:
 
             print("🔁 Loading pretrained YOLOv8 weights (head will be skipped)...")
 
-            ckpt = torch.load(weights_path, map_location="cpu")
+            ckpt = torch.load(weights_path, map_location="cpu", weights_only=False)
 
             state_dict = (
                 ckpt["model"].state_dict()
