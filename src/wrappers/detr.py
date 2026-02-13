@@ -56,27 +56,7 @@ class DetrWrapper(BaseDetectionModel):
             num_classes (int): number of target classes
             device: optional; ensures replaced layers are moved to correct device
         """
-
-        # Extract old classifier for shape reference
-        old_classifier = self.model.class_labels_classifier
-        in_features = old_classifier.in_features  # usually 256
-
-        # Create new classifier with correct number of classes
-        new_classifier = nn.Linear(in_features, num_classes + 1)
-        # +1 because DETR always includes a "no-object" class
-
-        # Optional: better initialization
-        nn.init.xavier_uniform_(new_classifier.weight)
-        nn.init.constant_(new_classifier.bias, 0.0)
-
-        # Assign back into model
-        self.model.class_labels_classifier = new_classifier
-        self.model.config.num_labels = num_classes
-
-        # Make sure new layer is on the correct device
-        if self.device is not None:
-            self.model.class_labels_classifier.to(self.device)
-
+        # Num classes is adapted in factory class
         print(f"✅ Updated model to {num_classes} classes")
 
     def predict(self, images: torch.Tensor, conf_thresh=0.5, iou_thresh=0.5):
