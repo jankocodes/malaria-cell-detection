@@ -122,3 +122,16 @@ def visualize_predictions(image, prediction, target=None):
         dpi=150,
         bbox_inches="tight",
     )
+
+
+def enforce_square_box(box, scaling_factor=1.05):
+    x1, y1, x2, y2 = box
+    w = x2 - x1
+    h = y2 - y1
+
+    side_length = max(w, h) * scaling_factor
+    x1 -= (side_length - w) / 2
+    y1 -= (side_length - h) / 2
+    x2 = x1 + side_length
+    y2 = y1 + side_length
+    return [x1, y1, x2, y2]
