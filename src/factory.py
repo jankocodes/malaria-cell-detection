@@ -9,12 +9,17 @@ from torchvision.models.detection import retinanet_resnet50_fpn
 from torchvision.models.detection import RetinaNet_ResNet50_FPN_Weights
 from pathlib import Path
 from transformers import DetrConfig, DetrForObjectDetection
+from transformers import (
+    DeformableDetrConfig,
+    DeformableDetrForObjectDetection,
+)
 import torch
 from ultralytics.nn.tasks import DetectionModel
 from wrappers.yolov5 import YOLOv5Wrapper
 from wrappers.retinanet import RetinaNetWrapper
 from wrappers.detr import DetrWrapper
 from wrappers.yolov8 import YOLOv8Wrapper
+from wrappers.deformable_detr import DeformableDetrWrapper
 from wrappers.base import BaseDetectionModel
 from typing import Any
 
@@ -26,6 +31,7 @@ class ModelType(str, Enum):
     YOLOV5 = "yolov5"
     RETINANET = "retinanet"
     DETR = "detr"
+    DEFORMABLE_DETR = "deformable_detr"
 
 
 class ModelFactory:
@@ -37,7 +43,7 @@ class ModelFactory:
     - YOLOv5
     - RetinaNet
     - DETR
-
+    - Deformable DETR
     Each model is wrapped in a corresponding wrapper class that provides a unified interface.
 
     Attributes:
@@ -56,6 +62,7 @@ class ModelFactory:
     - YOLOv5
     - RetinaNet
     - DETR
+    - Deformable DETR
     
     Each model is wrapped in a corresponding wrapper class that provides a unified interface.
     
@@ -71,7 +78,7 @@ class ModelFactory:
 
     def __init__(
         self,
-        num_classes: int = 7,
+        num_classes: int = 6,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
     ):
         self.device = device
@@ -107,6 +114,9 @@ class ModelFactory:
 
         elif model_type == ModelType.DETR:
             return self.load_detr(num_queries=num_queries, **kwargs)
+
+        elif model_type == ModelType.DEFORMABLE_DETR:
+            return self.load_deformable_detr(num_queries=num_queries, **kwargs)
 
         else:
             # This should never happen, but is nice for defensive programming
@@ -245,6 +255,40 @@ class ModelFactory:
                 )
             )
         return DetrWrapper(
+            model=model,
+            num_classes=self.num_classes,
+            device=self.device,
+        )
+
+    def load_deformable_detr(
+        self,
+        pretrained: bool = False,
+        weights="SenseTime/deformable-detr",
+        num_queries: int = 400,
+    ):
+
+        if pretrained:
+            config = DeformableDetrConfig.from_pretrained(weights)
+            config.num_queries = num_queries
+            config.num_labels = self.num_classes
+            config.auxiliary_loss = True
+
+            model = DeformableDetrForObjectDetection.from_pretrained(
+                weights,
+                config=config,
+                ignore_mismatched_sizes=True,
+            )
+        else:
+            config = DeformableDetrConfig(
+                use_pretrained_backbone=False,
+                num_labels=self.num_classes,
+                num_queries=num_queries,
+                auxiliary_loss=True,
+            )
+
+            model = DeformableDetrForObjectDetection(config)
+
+        return DeformableDetrWrapper(
             model=model,
             num_classes=self.num_classes,
             device=self.device,
