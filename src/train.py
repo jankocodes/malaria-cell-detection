@@ -54,7 +54,7 @@ def main(cfg, data_path=None, model_dir=None):
         else model_cfg["from_scratch_lr"]
     )
 
-    seperate_backbone_lr = model_cfg.get("seperate_backbone_lr", False)
+    seperate_backbone_lr = train_cfg.get("seperate_backbone_lr")
     optimizer = get_optimizer(
         model=model,
         model_type=model_type,
