@@ -141,7 +141,7 @@ def save_and_plot_lr_finder_results(
             linestyle="--",
             linewidth=2,
             alpha=0.8,
-            label=f"Suggested LR = {suggested_lr:.2e}",
+            label=f"Suggested LR = {suggested_lr}",
         )
         ax.legend()
 
