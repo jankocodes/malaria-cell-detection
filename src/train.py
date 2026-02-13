@@ -22,39 +22,40 @@ def main(cfg, data_path=None, model_dir=None):
     # --- Load Model ---
     factory = ModelFactory(device=device, num_classes=base_cfg["num_classes"])
     model_type = ModelType(model_cfg["type"])
+    pretrained = train_cfg["pretrained"]
     model = factory.load(
         model_type=model_type,
-        pretrained=train_cfg["pretrained"],
+        pretrained=pretrained,
         model_dir=model_dir,
         num_queries=model_cfg.get("num_queries", 400),
     )
 
     # --- Load Data ---
     print("Loading datasets...")
+    img_size = base_cfg.get("img_size", 640)
+    batch_size = model_cfg["batch_size"]
+    num_workers = base_cfg["num_workers"]
+
     train_loader = load_dataloader(
         data_path,
         dataset_type=DatasetType.TRAIN,
-        img_size=base_cfg.get("img_size", 640),
-        batch_size=model_cfg["batch_size"],
-        num_workers=base_cfg["num_workers"],
+        img_size=img_size,
+        batch_size=batch_size,
+        num_workers=num_workers,
     )
 
     val_loader = load_dataloader(
         data_path,
         dataset_type=DatasetType.VAL,
-        img_size=base_cfg.get("img_size", 640),
-        batch_size=model_cfg["batch_size"],
-        num_workers=base_cfg["num_workers"],
+        img_size=img_size,
+        batch_size=batch_size,
+        num_workers=num_workers,
     )
 
     # --- Optimizer ---
-    lr = (
-        model_cfg["pretrained_lr"]
-        if train_cfg["pretrained"]
-        else model_cfg["from_scratch_lr"]
-    )
+    lr = model_cfg["pretrained_lr"] if pretrained else model_cfg["from_scratch_lr"]
 
-    seperate_backbone_lr = model_cfg.get("seperate_backbone_lr", False)
+    seperate_backbone_lr = model_cfg.get("seperate_backbone_lr")
     optimizer = get_optimizer(
         model=model,
         model_type=model_type,
@@ -69,7 +70,7 @@ def main(cfg, data_path=None, model_dir=None):
 
     scheduler = OneCycleLR(
         optimizer,
-        max_lr=[lr * 0.1, lr] if seperate_backbone_lr else lr,
+        max_lr=[lr * 0.1, lr] if seperate_backbone_lr and pretrained else lr,
         steps_per_epoch=steps_per_epoch,
         epochs=num_epochs,
     )

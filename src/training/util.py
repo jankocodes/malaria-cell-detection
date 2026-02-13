@@ -163,6 +163,7 @@ def get_optimizer(
             weight_decay=5e-4,
             momentum=0.9,
         )
+
     elif model_type == ModelType.RETINANET:
         optimizer = torch.optim.SGD(
             model.parameters(),
@@ -170,14 +171,31 @@ def get_optimizer(
             weight_decay=1e-4,
             momentum=0.9,
         )
+
     elif model_type == ModelType.DETR:
 
-        if seperate_backbone_lr:
-            param_groups = get_seperate_backbone_lr(model, lr)
-        else:
-            param_groups = [{"params": model.parameters(), "lr": lr}]
+        param_groups = get_param_groups(
+            model,
+            seperate_backbone_lr,
+            model_type,
+            lr,
+        )
 
         optimizer = torch.optim.AdamW(
+            param_groups,
+            weight_decay=1e-4,
+        )
+
+    elif model_type == ModelType.DEFORMABLE_DETR:
+
+        param_groups = get_param_groups(
+            model,
+            seperate_backbone_lr,
+            model_type,
+            lr,
+        )
+
+        optimizer = torch.optim.Adam(
             param_groups,
             weight_decay=1e-4,
         )
@@ -190,24 +208,31 @@ def get_optimizer(
     return optimizer
 
 
-def get_seperate_backbone_lr(model, lr: float):
-    backbone_params = []
-    other_params = []
+def get_param_groups(model, seperate_backbone_lr, model_type, lr: float):
+
+    def match_name(name):
+        return "reference_points" in name or "sampling_offsets" in name
+
+    reduced_lr_params = []
+    params = []
 
     for name, param in model.model.named_parameters():
         if not param.requires_grad:
             continue
 
-        if "backbone" in name:
-            backbone_params.append(param)
+        if "backbone" in name and seperate_backbone_lr:
+            reduced_lr_params.append(param)
             print(f"Backbone param: {name}")
+        elif match_name(name) and model_type == ModelType.DEFORMABLE_DETR:
+            reduced_lr_params.append(param)
+            print(f"Deformable DETR special param: {name}")
         else:
-            other_params.append(param)
-            print(f"Other param: {name}")
+            params.append(param)
+            print(f"Regular param: {name}")
 
     param_groups = [
-        {"params": backbone_params, "lr": lr * 0.1},
-        {"params": other_params, "lr": lr},
+        {"params": reduced_lr_params, "lr": lr * 0.1},
+        {"params": params, "lr": lr},
     ]
     return param_groups
 

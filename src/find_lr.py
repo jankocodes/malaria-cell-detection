@@ -1,13 +1,11 @@
 import torch
 from factory import ModelFactory
-from data.dataset import BloodCellDataset, DatasetType
-from torch.utils.data import DataLoader
+from data.dataset import DatasetType
 from training.lr_finder import *
-from data.util import collate_fn, load_dataloader
+from data.util import load_dataloader
 from training.util import *
 from factory import ModelType
 import argparse
-import yaml
 import os
 import json
 
@@ -25,12 +23,14 @@ def main(cfg, data_path=None, model_dir=None):
 
     # --- Load Model ---
     model_type_str = model_cfg["type"]
+    model_type = ModelType(model_type_str)
+    pretrained = train_cfg["pretrained"]
     factory = ModelFactory(device=device, num_classes=base_cfg["num_classes"])
     model = factory.load(
-        model_type=ModelType(model_type_str),
-        pretrained=train_cfg["pretrained"],
+        model_type=model_type,
+        pretrained=pretrained,
         model_dir=model_dir,
-        num_queries=model_cfg.get("num_queries", 400),
+        num_queries=model_cfg.get("num_queries", 300),
     )
 
     # --- Load Data ---
@@ -50,7 +50,7 @@ def main(cfg, data_path=None, model_dir=None):
 
     base_lr = model_cfg.get("base_lr")  # Default to 0.001 if not specified
 
-    if train_cfg["pretrained"]:  # lower LR for pretrained models
+    if pretrained:  # lower LR for pretrained models
         base_lr /= 10
 
     min_lr = base_lr / 10
@@ -78,7 +78,7 @@ def main(cfg, data_path=None, model_dir=None):
     print(f"Suggested LR: {suggestion}")
 
     # --- Save Results as JSON ---
-    model_pretrained_str = "pretrained" if train_cfg["pretrained"] else "from_scratch"
+    model_pretrained_str = "pretrained" if pretrained else "from_scratch"
 
     save_dir = os.path.join("results", "lr_finder", model_pretrained_str)
     os.makedirs(save_dir, exist_ok=True)

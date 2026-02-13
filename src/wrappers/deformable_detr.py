@@ -2,21 +2,21 @@ import torch
 import torch.nn as nn
 from typing import Dict, List, Optional, Tuple, Any
 from .base import BaseDetectionModel
-from transformers import DetrForObjectDetection
+from transformers import DeformableDetrForObjectDetection
 import torch
 from typing import Dict, Any, List
 from torchvision.ops import box_convert
 
 
-class DetrWrapper(BaseDetectionModel):
+class DeformableDetrWrapper(BaseDetectionModel):
     """
-    DetrWrapper - PyTorch wrapper for Detr object detection models.
+    DeformableDetrWrapper - PyTorch wrapper for DeformableDetr object detection models.
 
-    A specialized wrapper that adapts Detr models to a standardized detection interface,
+    A specialized wrapper that adapts DeformableDetr models to a standardized detection interface,
     handling model configuration, loss computation, and target format conversion.
 
     Attributes:
-        model (nn.Module): The underlying Detr model instance
+        model (nn.Module): The underlying DeformableDetr model instance
         num_classes (int): Number of object classes for detection
         loss_fn (callable): Loss function for training (optional)
         device: Computation device (CPU or GPU)
@@ -25,17 +25,17 @@ class DetrWrapper(BaseDetectionModel):
         _set_num_classes(num_classes): Adapt model architecture for target class count
         _forward_train(images, targets): Execute model forward pass and compute loss during training
         _forward_eval(images): Execute model forward pass for evaluation/inference
-        _convert_targets_to_detr_format(targets, img_h, img_w): Convert targets from COCO to DETR format
+        _convert_targets_to_DeformableDetr_format(targets, img_h, img_w): Convert targets from COCO to DeformableDetr format
 
     Example:
-        >>> model = DetrWrapper(Detr_model, num_classes=80, device='cuda')
+        >>> model = DeformableDetrWrapper(DeformableDetr_model, num_classes=80, device='cuda')
         >>> output = model(images, targets)
         >>> loss = output['loss']
     """
 
     def __init__(
         self,
-        model: DetrForObjectDetection,
+        model: DeformableDetrForObjectDetection,
         num_classes: int,
         device,
         loss_fn: Optional[callable] = None,
@@ -49,10 +49,10 @@ class DetrWrapper(BaseDetectionModel):
 
     def _set_num_classes(self, num_classes: int):
         """
-        Dynamically change the number of classes for DETR models without touching source code.
+        Dynamically change the number of classes for DeformableDetr models without touching source code.
 
         Args:
-            model: DetrForObjectDetection
+            model: DeformableDetrForObjectDetection
             num_classes (int): number of target classes
             device: optional; ensures replaced layers are moved to correct device
         """
@@ -75,22 +75,24 @@ class DetrWrapper(BaseDetectionModel):
 
     def _forward_train(self, images: torch.Tensor, targets=None) -> dict:
         """
-        Unified DETR forward pass that uses DETR's internal loss during training.
+        Unified DeformableDetr forward pass that uses DeformableDetr's internal loss during training.
         """
 
         if targets is None:
             raise ValueError("targets must be provided during training")
 
-        # Convert targets from COCO format to DETR format
+        # Convert targets from COCO format to DeformableDetr format
         # COCO: [x, y, w, h] in pixels
-        # DETR: [x_center, y_center, w, h] normalized to [0, 1]
+        # DeformableDetr: [x_center, y_center, w, h] normalized to [0, 1]
         img_h, img_w = images.shape[2:]
-        detr_targets = self._convert_targets_to_detr_format(targets, img_h, img_w)
+        DeformableDetr_targets = self._convert_targets_to_DeformableDetr_format(
+            targets, img_h, img_w
+        )
 
-        # HF DETR requires named arguments
-        outputs = self.model(pixel_values=images, labels=detr_targets)
+        # HF DeformableDetr requires named arguments
+        outputs = self.model(pixel_values=images, labels=DeformableDetr_targets)
 
-        # HF DETR returns a dict-like object containing loss and loss components
+        # HF DeformableDetr returns a dict-like object containing loss and loss components
         total_loss = outputs.loss
         loss_dict = outputs.loss_dict
 
@@ -99,11 +101,11 @@ class DetrWrapper(BaseDetectionModel):
             # "loss_dict": loss_dict, -> optional detailed losses
         }
 
-    def _convert_targets_to_detr_format(
+    def _convert_targets_to_DeformableDetr_format(
         self, targets: List[Dict[str, torch.Tensor]], img_h: int, img_w: int
     ) -> List[Dict[str, torch.Tensor]]:
         """
-        Convert targets from COCO format to DETR format.
+        Convert targets from COCO format to DeformableDetr format.
 
         Args:
             targets: List of dicts with:
@@ -117,22 +119,24 @@ class DetrWrapper(BaseDetectionModel):
                 - 'boxes': [N, 4] in normalized [x_center, y_center, w, h] format
                 - 'class_labels': [N] class indices
         """
-        detr_targets = []
+        DeformableDetr_targets = []
 
         for target in targets:
             boxes = target["boxes"].clone().float()  # [N, 4]
             class_labels = target["class_labels"].clone()
 
-            # Convert COCO [x, y, w, h] to DETR [x_center, y_center, w, h]
+            # Convert COCO [x, y, w, h] to DeformableDetr [x_center, y_center, w, h]
             # and normalize to [0, 1]
             boxes[:, 0] = (boxes[:, 0] + boxes[:, 2] / 2) / img_w  # x_center
             boxes[:, 1] = (boxes[:, 1] + boxes[:, 3] / 2) / img_h  # y_center
             boxes[:, 2] = boxes[:, 2] / img_w  # width
             boxes[:, 3] = boxes[:, 3] / img_h  # height
 
-            detr_targets.append({"boxes": boxes, "class_labels": class_labels})
+            DeformableDetr_targets.append(
+                {"boxes": boxes, "class_labels": class_labels}
+            )
 
-        return detr_targets
+        return DeformableDetr_targets
 
     def _forward_eval(
         self,
@@ -140,7 +144,7 @@ class DetrWrapper(BaseDetectionModel):
         conf_thresh=0.0,
     ) -> Dict[str, Any]:
         """
-        Evaluation forward pass for DETR with post-processing.
+        Evaluation forward pass for DeformableDetr with post-processing.
 
         Returns YOLO-style predictions:
         - boxes: xyxy (pixels)
