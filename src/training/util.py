@@ -133,7 +133,7 @@ def train_one_epoch(
 def get_optimizer(
     model: BaseDetectionModel,
     model_type: ModelType,
-    lr: float,
+    lr_dict: dict,
     seperate_backbone_lr: bool = False,
 ) -> torch.optim.Optimizer:
     """
@@ -144,11 +144,13 @@ def get_optimizer(
     - YOLO models use SGD with weight decay 5e-4
     - RetinaNet uses SGD with weight decay 1e-4
     - DETR uses AdamW with differential learning rates for backbone vs other components
+    - Deformable DETR uses Adam with differential learning rates including special params
 
     Args:
         model (BaseDetectionModel): The detection model instance.
-        model_type (ModelType): The type of the model (YOLOV5, YOLOV8, RETINANET, or DETR).
-        lr (float): Base learning rate for the optimizer.
+        model_type (ModelType): The type of the model (YOLOV5, YOLOV8, RETINANET, DETR, or DEFORMABLE_DETR).
+        lr_dict (dict): Dictionary containing learning rates ('model_lr', 'backbone_lr', 'special_lr').
+        seperate_backbone_lr (bool): Whether to use separate learning rate for backbone parameters.
 
     Returns:
         torch.optim.Optimizer: Configured optimizer for the model.
@@ -156,6 +158,8 @@ def get_optimizer(
     Raises:
         ValueError: If the model type is not supported.
     """
+    lr = lr_dict["model_lr"]
+
     if model_type in {ModelType.YOLOV5, ModelType.YOLOV8}:
         optimizer = torch.optim.SGD(
             model.parameters(),
@@ -163,6 +167,7 @@ def get_optimizer(
             weight_decay=5e-4,
             momentum=0.9,
         )
+        print(f"Using SGD optimizer with LR={lr:.6f}")
 
     elif model_type == ModelType.RETINANET:
         optimizer = torch.optim.SGD(
@@ -171,69 +176,102 @@ def get_optimizer(
             weight_decay=1e-4,
             momentum=0.9,
         )
+        print(f"Using SGD optimizer with LR={lr:.6f}")
 
     elif model_type == ModelType.DETR:
-
         param_groups = get_param_groups(
             model,
             seperate_backbone_lr,
             model_type,
-            lr,
+            lr_dict,
         )
 
         optimizer = torch.optim.AdamW(
             param_groups,
             weight_decay=1e-4,
         )
+        print(f"Using AdamW optimizer with {len(param_groups)} parameter groups")
 
     elif model_type == ModelType.DEFORMABLE_DETR:
-
         param_groups = get_param_groups(
             model,
             seperate_backbone_lr,
             model_type,
-            lr,
+            lr_dict,
         )
 
         optimizer = torch.optim.Adam(
             param_groups,
             weight_decay=1e-4,
         )
+        print(f"Using Adam optimizer with {len(param_groups)} parameter groups")
 
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 
-    print(f"Using optimizer: {optimizer}")
-
     return optimizer
 
 
-def get_param_groups(model, seperate_backbone_lr, model_type, lr: float):
+def get_param_groups(model, seperate_backbone_lr, model_type, lr_dict: dict):
+    """
+    Create parameter groups with different learning rates.
 
-    def match_name(name):
+    Groups model parameters into categories with different learning rates:
+    - Backbone parameters: Lower LR when using pretrained weights
+    - Special parameters (Deformable DETR): reference_points and sampling_offsets get special LR
+    - Regular parameters: Standard model LR
+
+    Args:
+        model (BaseDetectionModel): The model to extract parameters from.
+        seperate_backbone_lr (bool): Whether to use separate LR for backbone.
+        model_type (ModelType): Type of model being trained.
+        lr_dict (dict): Dictionary containing 'model_lr', 'backbone_lr', 'special_lr'.
+
+    Returns:
+        list: List of parameter group dictionaries for optimizer.
+    """
+
+    def match_special_params(name):
+        """Check if parameter name matches special Deformable DETR parameters."""
         return "reference_points" in name or "sampling_offsets" in name
 
-    reduced_lr_params = []
-    params = []
+    # Extract learning rates from dict
+    lr_model = lr_dict["model_lr"]
+    lr_backbone = lr_dict["backbone_lr"]
+    lr_special = lr_dict["special_lr"]
+
+    # Collect parameters into groups
+    backbone_params = []
+    model_params = []
+    special_params = []
 
     for name, param in model.model.named_parameters():
         if not param.requires_grad:
             continue
 
+        # Categorize parameter
         if "backbone" in name and seperate_backbone_lr:
-            reduced_lr_params.append(param)
-            print(f"Backbone param: {name}")
-        elif match_name(name) and model_type == ModelType.DEFORMABLE_DETR:
-            reduced_lr_params.append(param)
-            print(f"Deformable DETR special param: {name}")
+            backbone_params.append(param)
+            print(f"Backbone param: {name} (LR: {lr_backbone:.6f})")
+        elif match_special_params(name) and model_type == ModelType.DEFORMABLE_DETR:
+            special_params.append(param)
+            print(f"Deformable DETR special param: {name} (LR: {lr_special:.6f})")
         else:
-            params.append(param)
-            print(f"Regular param: {name}")
+            model_params.append(param)
+            print(f"Regular param: {name} (LR: {lr_model:.6f})")
 
-    param_groups = [
-        {"params": reduced_lr_params, "lr": lr * 0.1},
-        {"params": params, "lr": lr},
-    ]
+    # Build parameter groups (only include non-empty groups)
+    param_groups = []
+
+    if backbone_params:
+        param_groups.append({"params": backbone_params, "lr": lr_backbone})
+
+    if model_params:
+        param_groups.append({"params": model_params, "lr": lr_model})
+
+    if special_params:
+        param_groups.append({"params": special_params, "lr": lr_special})
+
     return param_groups
 
 
@@ -258,6 +296,54 @@ def set_random_seed(seed: int = 42, deterministic: bool = True):
     else:
         torch.backends.cudnn.deterministic = False
         torch.backends.cudnn.benchmark = True
+
+
+def get_lr_dict(model_cfg, pretrained, finder=False):
+    """
+    Get learning rate dictionary for different parts of the model.
+
+    Creates a dictionary with learning rates for:
+    - model_lr: Main learning rate for most parameters
+    - backbone_lr: Learning rate for backbone (typically 0.1x model_lr for pretrained DETR)
+    - special_lr: Learning rate for special parameters in Deformable DETR (reference_points, sampling_offsets)
+
+    Args:
+        model_cfg (dict): Model configuration containing learning rate settings.
+        pretrained (bool): Whether using pretrained weights.
+        finder (bool): Whether running LR finder (uses base_lr if True).
+
+    Returns:
+        dict: Dictionary with 'model_lr', 'backbone_lr', and 'special_lr' keys.
+    """
+    # Determine the main model learning rate
+    model_lr = (
+        model_cfg["base_lr"]
+        if finder
+        else (
+            model_cfg["pretrained_lr"] if pretrained else model_cfg["from_scratch_lr"]
+        )
+    )
+
+    # Backbone LR: use explicit value or default to 0.1x model_lr
+    backbone_lr = model_cfg.get("backbone_lr", model_lr * 0.1)
+
+    # Special LR for Deformable DETR parameters
+    if pretrained:
+        special_lr = model_cfg.get(
+            "pretrained_special_lr", model_cfg.get("special_lr", model_lr * 0.1)
+        )
+    else:
+        special_lr = model_cfg.get(
+            "from_scratch_special_lr", model_cfg.get("special_lr", model_lr * 0.1)
+        )
+
+    lr_dict = {
+        "model_lr": model_lr,
+        "backbone_lr": backbone_lr,
+        "special_lr": special_lr,
+    }
+
+    return lr_dict
 
 
 def save_and_plot_train_results(

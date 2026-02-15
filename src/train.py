@@ -53,24 +53,24 @@ def main(cfg, data_path=None, model_dir=None):
     )
 
     # --- Optimizer ---
-    lr = model_cfg["pretrained_lr"] if pretrained else model_cfg["from_scratch_lr"]
+    lr_dict = get_lr_dict(model_cfg, pretrained)
 
-    seperate_backbone_lr = model_cfg.get("seperate_backbone_lr")
+    seperate_backbone_lr = model_cfg.get("seperate_backbone_lr", False)
     optimizer = get_optimizer(
         model=model,
         model_type=model_type,
-        lr=lr,
+        lr_dict=lr_dict,
         seperate_backbone_lr=seperate_backbone_lr,
     )
 
     # --- LR Scheduler ---
     num_epochs = train_cfg["num_epochs"]
-
     steps_per_epoch = len(train_loader)
+    max_lr = [pg["lr"] for pg in optimizer.param_groups]
 
     scheduler = OneCycleLR(
         optimizer,
-        max_lr=[lr * 0.1, lr] if seperate_backbone_lr and pretrained else lr,
+        max_lr=max_lr,
         steps_per_epoch=steps_per_epoch,
         epochs=num_epochs,
     )

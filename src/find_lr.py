@@ -48,7 +48,7 @@ def main(cfg, data_path=None, model_dir=None):
     # --- Training Loop ---
     print("Finding learning rate...")
 
-    base_lr = model_cfg.get("base_lr")  # Default to 0.001 if not specified
+    base_lr = model_cfg.get("base_lr")
 
     if pretrained:  # lower LR for pretrained models
         base_lr /= 10
@@ -57,10 +57,19 @@ def main(cfg, data_path=None, model_dir=None):
     max_lr = base_lr * 10
 
     # --- Optimizer ---
+    seperate_backbone_lr = model_cfg.get("seperate_backbone_lr", False)
+
+    lr_dict = {
+        "model_lr": min_lr,
+        "backbone_lr": min_lr * 0.1 if seperate_backbone_lr else min_lr,
+        "special_lr": min_lr * 0.1,
+    }
+
     optimizer = get_optimizer(
         model=model,
         model_type=ModelType(model_type_str),
-        lr=min_lr,
+        lr_dict=lr_dict,
+        seperate_backbone_lr=seperate_backbone_lr,
     )
 
     lr_finder = find_lr(
