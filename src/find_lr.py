@@ -57,7 +57,9 @@ def main(cfg, data_path=None, model_dir=None):
     max_lr = base_lr * 10
 
     # --- Optimizer ---
-    seperate_backbone_lr = model_cfg.get("seperate_backbone_lr", False)
+    seperate_backbone_lr = model_cfg.get("seperate_backbone_lr", False) & train_cfg.get(
+        "pretrained", False
+    )
 
     lr_dict = {
         "model_lr": min_lr,

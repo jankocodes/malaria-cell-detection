@@ -55,7 +55,10 @@ def main(cfg, data_path=None, model_dir=None):
     # --- Optimizer ---
     lr_dict = get_lr_dict(model_cfg, pretrained)
 
-    seperate_backbone_lr = model_cfg.get("seperate_backbone_lr", False)
+    seperate_backbone_lr = model_cfg.get(
+        "seperate_backbone_lr", False
+    ) and train_cfg.get("pretrained", False)
+
     optimizer = get_optimizer(
         model=model,
         model_type=model_type,
