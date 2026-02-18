@@ -101,7 +101,7 @@ def main(cfg, data_path=None, model_dir=None):
     save_and_plot_lr_finder_results(
         lr_finder,
         model_name=model_type_str,
-        range=(min_lr, max_lr),
+        lr_range=(min_lr, max_lr),
         model_pretrained_str=model_pretrained_str,
     )
 

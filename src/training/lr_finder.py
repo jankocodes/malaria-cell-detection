@@ -76,7 +76,7 @@ def find_lr(
 def save_and_plot_lr_finder_results(
     lr_finder: FastaiLRFinder,
     model_name: str,
-    range: tuple,
+    lr_range: tuple,
     model_pretrained_str: str,
     skip_start=0,
     skip_end=1,
@@ -121,7 +121,7 @@ def save_and_plot_lr_finder_results(
         return _plot_single_lr_finder(
             lr_finder=lr_finder,
             model_name=model_name,
-            range=range,
+            range=lr_range,
             model_pretrained_str=model_pretrained_str,
             skip_start=skip_start,
             skip_end=skip_end,
@@ -141,7 +141,7 @@ def save_and_plot_lr_finder_results(
         param_group_names = ["Backbone", "Head", "Special"]
 
     axes = []
-    lr_min, lr_max = range
+    lr_min, lr_max = lr_range
 
     for group_idx in range(num_groups):
         fig, ax = plt.subplots(figsize=figsize)
