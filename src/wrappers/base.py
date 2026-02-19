@@ -26,27 +26,44 @@ class BaseDetectionModel(ABC, nn.Module):
         self,
         images: torch.Tensor,
         targets: Optional[List[Dict[str, torch.Tensor]]] = None,
+        return_predictions: bool = False,
     ) -> Dict[str, torch.Tensor]:
         """
         Forward pass of the model.
 
+        Behavior is determined by arguments, not by model.train() / model.eval() state:
+          - targets provided      → compute and return {"loss": ...}
+          - return_predictions    → also include {"predictions": ...}
+          - targets is None       → return predictions only
+
         Args:
             images: Batch of images [B, C, H, W]
-            targets: List of dicts with 'boxes' [N, 4] and 'labels' [N]
-                    Only required during training
+            targets: List of dicts with 'boxes' [N, 4] and 'class_labels' [N].
+                     When provided, loss is computed and returned.
+            return_predictions: If True, predictions are included in the output
+                                alongside the loss.
 
         Returns:
-            During training: Dict with losses {'loss': total_loss, 'box_loss': ..., 'cls_loss': ...}
-            During inference: Dict with predictions {'boxes': ..., 'scores': ..., 'labels': ...}
+            Dict with one or both of:
+              {'loss': tensor}
+              {'predictions': list of per-image dicts with 'boxes', 'scores', 'labels'}
         """
-        if self.training:
-            if targets is None:
-                raise ValueError("Targets must be provided in training mode.")
-            return self._forward_train(images, targets)
-        else:
-            out_raw = self._forward_eval(images)
+        result = {}
 
-            return self._postprocess_predictions(out_raw, images.shape)
+        if targets is not None:
+            # Pass return_predictions so _forward_train can optionally include
+            # predictions in a single model call (e.g. YOLOv5 eval-mode tuple).
+            result.update(self._forward(images, targets, return_predictions))
+        else:
+            result.update(self._predict(images))
+        print(result.keys())
+
+        if "predictions" in result:
+            result["predictions"] = self._postprocess_predictions(
+                result["predictions"], images.shape
+            )
+
+        return result
 
     def _postprocess_predictions(
         self, out_raw: List[Dict[str, torch.Tensor]], img_size: tuple
@@ -61,11 +78,12 @@ class BaseDetectionModel(ABC, nn.Module):
         Returns:
             List of dicts with 'boxes', 'scores', 'labels' per image.
         """
+
         B, _, H, W = img_size
 
         outputs_pp = []
         for b in range(B):
-            out = out_raw["predictions"][b]
+            out = out_raw[b]
 
             # Clamp boxes to image boundaries
             if out["boxes"].numel() > 0:
@@ -87,7 +105,7 @@ class BaseDetectionModel(ABC, nn.Module):
                 }
             )
 
-        return {"predictions": outputs_pp}
+        return outputs_pp
 
     @abstractmethod
     def _set_num_classes(self, num_classes: int):
