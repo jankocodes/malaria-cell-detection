@@ -85,7 +85,37 @@ class DeformableDetrWrapper(BaseDetectionModel):
             self.model.class_embed.to(self.device)
         print(f"✅ Updated model to {num_classes} classes")
 
-    def predict(self, images: torch.Tensor, conf_thresh=0.5, iou_thresh=0.5):
+    def _forward(
+        self, images: torch.Tensor, targets=None, return_predictions=False
+    ) -> dict:
+        """
+        Unified DeformableDetr forward pass that uses DeformableDetr's internal loss during training.
+        """
+
+        result = {}
+        # Convert targets from COCO format to DeformableDetr format
+        # COCO: [x, y, w, h] in pixels
+        # DeformableDetr: [x_center, y_center, w, h] normalized to [0, 1]
+        if targets is not None:
+            img_h, img_w = images.shape[2:]
+            detr_targets = self._convert_targets_to_detr_format(targets, img_h, img_w)
+
+            # HF DeformableDetr requires named arguments
+            outputs = self.model(pixel_values=images, labels=detr_targets)
+
+            # HF DeformableDetr returns a dict-like object containing loss and loss components
+            total_loss = outputs.loss
+            result["loss"] = total_loss
+
+        if return_predictions or targets is None:
+            predictions = self._predict(images)
+            result["predictions"] = predictions
+
+        return result
+
+    def _predict(
+        self, images: torch.Tensor, postprocess=True, conf_thresh=0.5, iou_thresh=0.5
+    ):
         """
         Run inference and post-process outputs.
 
@@ -97,37 +127,76 @@ class DeformableDetrWrapper(BaseDetectionModel):
         Returns:
             List of dicts per image with keys 'boxes', 'scores', 'labels'.
         """
-        return self._forward_eval(images, conf_thresh=conf_thresh)
+        self.model.eval()
+        with torch.no_grad():
+            predictions = self.model(images)
+        self.model.train()
 
-    def _forward_train(self, images: torch.Tensor, targets=None) -> dict:
+        if postprocess:
+            predictions = self._post_process_predictions(
+                predictions, images.shape, conf_thresh, iou_thresh
+            )
+        return predictions
+
+    def _post_process_predictions(
+        self, outputs, img_size, conf_thresh=0.5, iou_thresh=0.5
+    ):
         """
-        Unified DeformableDetr forward pass that uses DeformableDetr's internal loss during training.
+        Post-process raw model predictions to evaluator-ready format.
+
+        Args:
+            outputs: Raw outputs from the DeformableDetr model.
+            img_size: Tuple (B, C, H, W) of the input images.
+            conf_thresh: Confidence threshold for filtering predictions.
+            iou_thresh: IoU threshold for NMS.
+
+        Returns:
+            List of dicts with 'boxes', 'scores', 'labels' per image.
         """
+        _, _, H, W = img_size
+        logits = outputs.logits  # [B, Q, C+1]
+        boxes = outputs.pred_boxes  # [B, Q, 4] (cxcywh, normalized)
+        B, Q, _ = boxes.shape
 
-        if targets is None:
-            raise ValueError("targets must be provided during training")
+        # Convert class logits → probabilities (drop no-object)
+        probs = logits.softmax(-1)[..., :-1]
+        scores, labels = probs.max(-1)  # [B, Q]
 
-        # Convert targets from COCO format to DeformableDetr format
-        # COCO: [x, y, w, h] in pixels
-        # DeformableDetr: [x_center, y_center, w, h] normalized to [0, 1]
-        img_h, img_w = images.shape[2:]
-        DeformableDetr_targets = self._convert_targets_to_DeformableDetr_format(
-            targets, img_h, img_w
-        )
+        boxes_xyxy = box_convert(
+            boxes.view(-1, 4), in_fmt="cxcywh", out_fmt="xyxy"
+        ).view(B, Q, 4)
 
-        # HF DeformableDetr requires named arguments
-        outputs = self.model(pixel_values=images, labels=DeformableDetr_targets)
+        # Scale to pixel coordinates
+        scale = torch.tensor([W, H, W, H], device=boxes.device)
+        boxes_xyxy = boxes_xyxy * scale
 
-        # HF DeformableDetr returns a dict-like object containing loss and loss components
-        total_loss = outputs.loss
-        loss_dict = outputs.loss_dict
+        predictions: List[Dict[str, torch.Tensor]] = []
 
-        return {
-            "loss": total_loss,
-            # "loss_dict": loss_dict, -> optional detailed losses
-        }
+        for b in range(B):
+            keep = scores[b] > conf_thresh
 
-    def _convert_targets_to_DeformableDetr_format(
+            if keep.sum() == 0:
+                predictions.append(
+                    {
+                        "boxes": torch.empty((0, 4), device=boxes.device),
+                        "scores": torch.empty((0,), device=boxes.device),
+                        "labels": torch.empty(
+                            (0,), device=boxes.device, dtype=torch.long
+                        ),
+                    }
+                )
+                continue
+
+            predictions.append(
+                {
+                    "boxes": boxes_xyxy[b][keep],
+                    "scores": scores[b][keep],
+                    "labels": labels[b][keep],
+                }
+            )
+        return predictions
+
+    def _convert_targets_to_detr_format(
         self, targets: List[Dict[str, torch.Tensor]], img_h: int, img_w: int
     ) -> List[Dict[str, torch.Tensor]]:
         """
@@ -163,64 +232,3 @@ class DeformableDetrWrapper(BaseDetectionModel):
             )
 
         return DeformableDetr_targets
-
-    def _forward_eval(
-        self,
-        images: torch.Tensor,
-        conf_thresh=0.0,
-    ) -> Dict[str, Any]:
-        """
-        Evaluation forward pass for DeformableDetr with post-processing.
-
-        Returns YOLO-style predictions:
-        - boxes: xyxy (pixels)
-        - scores: confidence scores
-        - labels: class indices
-        """
-        with torch.no_grad():
-            outputs = self.model(images)
-
-        logits = outputs.logits  # [B, Q, C+1]
-        boxes = outputs.pred_boxes  # [B, Q, 4] (cxcywh, normalized)
-
-        # Convert class logits → probabilities (drop no-object)
-        probs = logits.softmax(-1)[..., :-1]
-        scores, labels = probs.max(-1)  # [B, Q]
-
-        B, Q, _ = boxes.shape
-        _, _, H, W = images.shape
-
-        boxes_xyxy = box_convert(
-            boxes.view(-1, 4), in_fmt="cxcywh", out_fmt="xyxy"
-        ).view(B, Q, 4)
-
-        # Scale to pixel coordinates
-        scale = torch.tensor([W, H, W, H], device=boxes.device)
-        boxes_xyxy = boxes_xyxy * scale
-
-        outputs_pp: List[Dict[str, torch.Tensor]] = []
-
-        for b in range(B):
-            keep = scores[b] > conf_thresh
-
-            if keep.sum() == 0:
-                outputs_pp.append(
-                    {
-                        "boxes": torch.empty((0, 4), device=boxes.device),
-                        "scores": torch.empty((0,), device=boxes.device),
-                        "labels": torch.empty(
-                            (0,), device=boxes.device, dtype=torch.long
-                        ),
-                    }
-                )
-                continue
-
-            outputs_pp.append(
-                {
-                    "boxes": boxes_xyxy[b][keep],
-                    "scores": scores[b][keep],
-                    "labels": labels[b][keep],
-                }
-            )
-
-        return {"predictions": outputs_pp}
