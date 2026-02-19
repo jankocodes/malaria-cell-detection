@@ -104,85 +104,121 @@ class YOLOv5Wrapper(BaseDetectionModel):
 
         print(f"✅ Updated model to {num_classes} classes")
 
-    def _forward_train(self, images: torch.Tensor, targets) -> dict:
-        """
-        Forward pass — returns raw model predictions and computed loss.
-
-        Args:
-            images (torch.Tensor): Batch of input images, shape [B, 3, H, W].
-            targets (List[Dict], optional): Ground-truth annotations per image.
-            Each dict should contain:
-                - 'boxes': Tensor [N, 4] in xyxy pixel coords
-                - 'labels': Tensor [N] class indices
-            Required for training; may be None for inference.
-
-        Returns:
-            Dict with:
-            'predictions' :
-                - Training (YOLOv5 multi-scale): list of 3 tensors:
-                  [B, 3, H/8,  W/8,  5 + num_classes],
-                  [B, 3, H/16, W/16, 5 + num_classes],
-                  [B, 3, H/32, W/32, 5 + num_classes]
-                - Inference (flattened): None
-            'loss' :
-                - Loss returned by compute_loss when targets are provided.
-                - None if targets is omitted (inference mode).
-
-        Notes:
-            - 'predictions' are raw network outputs (anchor/logit space) and require
-              decoding and NMS to produce final detections.
-            - When targets are supplied, compute_loss() is invoked and its result
-              is returned under 'loss'.
-        """
-        pred = self.model(images)
-        loss, _ = self.compute_loss(pred, targets, images.shape[2:])
-
-        return {
-            "loss": loss,
-        }
-
-    def _forward_eval(
+    def _forward(
         self,
         images: torch.Tensor,
+        targets=None,
+        return_predictions: bool = False,
+    ) -> dict:
+        """
+        Single forward pass — computes loss and/or predictions depending on arguments.
+
+        YOLOv5 in eval mode returns (decoded_preds, feature_maps); this is exploited so
+        that a single model call during validation provides both the loss (from feature_maps)
+        and the predictions (from decoded_preds), avoiding a double forward pass.
+
+        Args:
+            images: [B, 3, H, W]
+            targets: list of dicts with 'boxes' and 'class_labels'. When provided, loss
+                     is computed.
+            return_predictions: when True, post-NMS predictions are included in the output.
+
+        Returns:
+            Dict with any combination of 'loss' and 'predictions'.
+        """
+        result = {}
+
+        model_out = self.model(images)
+        print(f"Model output type: {type(model_out)}")
+
+        # YOLOv5 Detect layer:
+        #   training mode → list of feature-map tensors
+        #   eval mode     → (decoded_tensor, list of feature-map tensors)
+        if isinstance(model_out, tuple):
+            decoded_preds, feature_maps = model_out
+        else:
+            decoded_preds = None
+            feature_maps = model_out
+
+        if targets is not None:
+            loss, _ = self.compute_loss(feature_maps, targets, images.shape[2:])
+            result["loss"] = loss
+
+        if return_predictions or targets is None:
+
+            if decoded_preds is None:
+                # Model is in train mode; switch briefly to get decoded predictions.
+                # This path is only hit when return_predictions=True is requested
+                decoded_preds = self._predict(
+                    images, post_processing=False
+                )  # sets model to eval mode and gets decoded_preds
+
+            nms_out = non_max_suppression(
+                decoded_preds, conf_thres=0.005, iou_thres=0.5
+            )
+            predictions = self._format_predictions(nms_out, images.device)
+
+            result["predictions"] = predictions
+
+        return result
+
+    def _predict(
+        self,
+        images: torch.Tensor,
+        post_processing: bool = True,
         iou_thresh=0.5,
         conf_thresh=0.005,
     ) -> dict:
         """
-        Forward pass for evaluation — returns final detections.
+        Run inference to obtain final detections.
+
+        Args:
+            images (torch.Tensor): Batch of input images, shape [B, 3, H, W].
+            iou_thresh (float): IoU threshold for NMS.
+            conf_thresh (float): Confidence threshold for filtering boxes.
+
+        Returns:
+            Dict with:
+            'predictions' : List of dicts per image with:
+                - 'boxes': Tensor [N, 4] in xyxy pixel coords
+                - 'scores': Tensor [N] confidence scores
+                - 'labels': Tensor [N] class indices
         """
+
+        self.model.eval()
         with torch.no_grad():
-            pred = self.model(images)[0]  # decoded predictions
+            predictions = self.model(images)[0]
+        self.model.train()
 
-            pred = non_max_suppression(
-                pred,
-                conf_thres=conf_thresh,
-                iou_thres=iou_thresh,
+        # Post-process predictions with NMS
+        if post_processing:
+            nms_out = non_max_suppression(
+                predictions, conf_thres=conf_thresh, iou_thres=iou_thresh
             )
+            predictions = self._format_predictions(nms_out, images.device)
 
+        return predictions
+
+    def _format_predictions(self, nms_out, device):
         outputs = []
-
-        for p in pred:
+        for p in nms_out:
             if p is None or len(p) == 0:
                 outputs.append(
                     {
-                        "boxes": torch.empty((0, 4), device=images.device),
-                        "scores": torch.empty((0,), device=images.device),
-                        "labels": torch.empty(
-                            (0,), device=images.device, dtype=torch.long
-                        ),
+                        "boxes": torch.empty((0, 4), device=device),
+                        "scores": torch.empty((0,), device=device),
+                        "labels": torch.empty((0,), device=device, dtype=torch.long),
                     }
                 )
-                continue
-
-            outputs.append(
-                {
-                    "boxes": p[:, :4],  # xyxy
-                    "scores": p[:, 4],
-                    "labels": p[:, 5].long(),
-                }
-            )
-
-        return {"predictions": outputs}
+            else:
+                outputs.append(
+                    {
+                        "boxes": p[:, :4],
+                        "scores": p[:, 4],
+                        "labels": p[:, 5].long(),
+                    }
+                )
+        return outputs
 
     def compute_loss(
         self,
@@ -213,33 +249,6 @@ class YOLOv5Wrapper(BaseDetectionModel):
 
         # Return structured loss dict
         return loss, loss_items
-
-    def predict(
-        self,
-        images: torch.Tensor,
-        iou_thresh=0.5,
-        conf_thresh=0.005,
-    ) -> dict:
-        """
-        Run inference to obtain final detections.
-
-        Args:
-            images (torch.Tensor): Batch of input images, shape [B, 3, H, W].
-            iou_thresh (float): IoU threshold for NMS.
-            conf_thresh (float): Confidence threshold for filtering boxes.
-
-        Returns:
-            Dict with:
-            'predictions' : List of dicts per image with:
-                - 'boxes': Tensor [N, 4] in xyxy pixel coords
-                - 'scores': Tensor [N] confidence scores
-                - 'labels': Tensor [N] class indices
-        """
-        return self._forward_eval(
-            images,
-            iou_thresh=iou_thresh,
-            conf_thresh=conf_thresh,
-        )
 
     def _convert_targets_to_yolov5_format(self, targets, img_size):
         """
