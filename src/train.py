@@ -76,6 +76,11 @@ def main(cfg, data_path=None, model_dir=None):
         max_lr=max_lr,
         steps_per_epoch=steps_per_epoch,
         epochs=num_epochs,
+        cycle_momentum=False,
+        pct_start=0.1,
+        anneal_strategy="cos",
+        div_factor=10,
+        final_div_factor=1000,
     )
 
     # --- Training Loop ---
