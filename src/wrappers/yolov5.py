@@ -136,6 +136,8 @@ class YOLOv5Wrapper(BaseDetectionModel):
         #   eval mode     → (decoded_tensor, list of feature-map tensors)
         if isinstance(model_out, tuple):
             decoded_preds, feature_maps = model_out
+            predictions = self._post_process_predictions(decoded_preds, images.device)
+
         else:
             decoded_preds = None
             feature_maps = model_out
@@ -149,14 +151,9 @@ class YOLOv5Wrapper(BaseDetectionModel):
             if decoded_preds is None:
                 # Model is in train mode; switch briefly to get decoded predictions.
                 # This path is only hit when return_predictions=True is requested
-                decoded_preds = self._predict(
-                    images, post_processing=False
+                predictions = self._predict(
+                    images
                 )  # sets model to eval mode and gets decoded_preds
-
-            nms_out = non_max_suppression(
-                decoded_preds, conf_thres=0.005, iou_thres=0.5
-            )
-            predictions = self._format_predictions(nms_out, images.device)
 
             result["predictions"] = predictions
 
@@ -165,9 +162,9 @@ class YOLOv5Wrapper(BaseDetectionModel):
     def _predict(
         self,
         images: torch.Tensor,
-        post_processing: bool = True,
         iou_thresh=0.5,
         conf_thresh=0.005,
+        postprocess: bool = True,
     ) -> dict:
         """
         Run inference to obtain final detections.
@@ -190,13 +187,21 @@ class YOLOv5Wrapper(BaseDetectionModel):
             predictions = self.model(images)[0]
         self.model.train()
 
-        # Post-process predictions with NMS
-        if post_processing:
-            nms_out = non_max_suppression(
-                predictions, conf_thres=conf_thresh, iou_thres=iou_thresh
+        if postprocess:
+            predictions = self._post_process_predictions(
+                predictions, images.device, conf_thresh, iou_thresh
             )
-            predictions = self._format_predictions(nms_out, images.device)
 
+        return predictions
+
+    def _post_process_predictions(
+        self, predictions, device, conf_thresh=0.005, iou_thresh=0.5
+    ):
+
+        nms_out = non_max_suppression(
+            predictions, conf_thres=conf_thresh, iou_thres=iou_thresh
+        )
+        predictions = self._format_predictions(nms_out, device)
         return predictions
 
     def _format_predictions(self, nms_out, device):

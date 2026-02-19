@@ -100,14 +100,7 @@ class YOLOv8Wrapper(BaseDetectionModel):
 
         if return_predictions or targets is None:
             # Predictions require eval-mode decoded outputs.
-            decoded_preds = self._predict(
-                images, post_processing=False
-            )  # get raw predictions without NMS
-
-            nms_out = non_max_suppression(
-                decoded_preds, conf_thres=0.005, iou_thres=0.5
-            )
-            predictions = self._format_predictions(nms_out, images.device)
+            predictions = self._predict(images)  # get raw predictions without NMS
 
             result["predictions"] = predictions
 
@@ -116,7 +109,7 @@ class YOLOv8Wrapper(BaseDetectionModel):
     def _predict(
         self,
         images: torch.Tensor,
-        post_processing: bool = True,
+        postprocess: bool = True,
         conf_thresh=0.005,
         iou_thresh=0.5,
     ):
@@ -138,14 +131,20 @@ class YOLOv8Wrapper(BaseDetectionModel):
         if was_training:
             self.model.train()
 
-        if post_processing:
-            nms_out = non_max_suppression(
-                predictions,
-                conf_thres=conf_thresh,
-                iou_thres=iou_thresh,
+        if postprocess:
+            predictions = self._post_process_predictions(
+                predictions, images.device, conf_thresh, iou_thresh
             )
-            predictions = self._format_predictions(nms_out, images.device)
 
+        return predictions
+
+    def _post_process_predictions(
+        self, decoded_preds, device, conf_thresh=0.005, iou_thresh=0.5
+    ):
+        nms_out = non_max_suppression(
+            decoded_preds, conf_thres=conf_thresh, iou_thres=iou_thresh
+        )
+        predictions = self._format_predictions(nms_out, device)
         return predictions
 
     def _format_predictions(self, nms_out, device):

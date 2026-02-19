@@ -56,16 +56,15 @@ class BaseDetectionModel(ABC, nn.Module):
             result.update(self._forward(images, targets, return_predictions))
         else:
             result.update(self._predict(images))
-        print(result.keys())
 
         if "predictions" in result:
-            result["predictions"] = self._postprocess_predictions(
+            result["predictions"] = self._filter_invlalid_predictions(
                 result["predictions"], images.shape
             )
 
         return result
 
-    def _postprocess_predictions(
+    def _filter_invlalid_predictions(
         self, out_raw: List[Dict[str, torch.Tensor]], img_size: tuple
     ) -> List[Dict[str, torch.Tensor]]:
         """
