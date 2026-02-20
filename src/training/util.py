@@ -78,7 +78,6 @@ def train_one_epoch(
         total_train_loss += train_loss.item()
 
         training_pbar.set_postfix({"loss": f"{train_loss.item():.4f}"})
-        break
 
     # --- Validation ---
     model.eval()
@@ -109,7 +108,6 @@ def train_one_epoch(
             all_targets.extend(coco_targets)
 
             val_pbar.set_postfix({"loss": f"{val_loss.item():.4f}"})
-            break
 
     model.train()
 
