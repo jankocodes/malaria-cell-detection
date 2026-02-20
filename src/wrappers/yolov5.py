@@ -129,7 +129,6 @@ class YOLOv5Wrapper(BaseDetectionModel):
         result = {}
 
         model_out = self.model(images)
-        print(f"Model output type: {type(model_out)}")
 
         # YOLOv5 Detect layer:
         #   training mode → list of feature-map tensors
