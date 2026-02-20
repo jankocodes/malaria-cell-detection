@@ -55,7 +55,7 @@ class BaseDetectionModel(ABC, nn.Module):
             # predictions in a single model call (e.g. YOLOv5 eval-mode tuple).
             result.update(self._forward(images, targets, return_predictions))
         else:
-            result.update(self._predict(images))
+            result["predictions"] = self._predict(images)
 
         if "predictions" in result:
             result["predictions"] = self._filter_invlalid_predictions(
