@@ -105,9 +105,14 @@ class DeformableDetrWrapper(BaseDetectionModel):
 
             # HF DeformableDetr returns a dict-like object containing loss and loss components
             total_loss = outputs.loss
+
+            if return_predictions:
+                predictions = self._post_process_predictions(outputs, images.shape)
+                result["predictions"] = predictions
+
             result["loss"] = total_loss
 
-        if return_predictions or targets is None:
+        if (return_predictions or targets is None) and "predictions" not in result:
             predictions = self._predict(images)
             result["predictions"] = predictions
 
