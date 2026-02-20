@@ -64,6 +64,16 @@ class BaseDetectionModel(ABC, nn.Module):
 
         return result
 
+    def predict(self, images: torch.Tensor, conf_thresh=0.2, iou_thresh=0.5):
+        predictions = self._predict(
+            images, conf_thresh=conf_thresh, iou_thresh=iou_thresh
+        )
+        filtered_predictions = self._filter_invlalid_predictions(
+            predictions, images.shape
+        )
+
+        return {"predictions": filtered_predictions}
+
     def _filter_invlalid_predictions(
         self, out_raw: List[Dict[str, torch.Tensor]], img_size: tuple
     ) -> List[Dict[str, torch.Tensor]]:
