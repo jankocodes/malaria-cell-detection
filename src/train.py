@@ -70,6 +70,7 @@ def main(cfg, data_path=None, model_dir=None, save_results=True):
     num_epochs = train_cfg["num_epochs"]
     steps_per_epoch = len(train_loader)
     max_lr = [pg["lr"] for pg in optimizer.param_groups]
+    warmup = train_cfg["warmup"]
 
     scheduler = OneCycleLR(
         optimizer,
@@ -77,7 +78,7 @@ def main(cfg, data_path=None, model_dir=None, save_results=True):
         steps_per_epoch=steps_per_epoch,
         epochs=num_epochs,
         cycle_momentum=False,
-        pct_start=0.1,
+        pct_start=warmup,
         anneal_strategy="cos",
         div_factor=10,
         final_div_factor=1000,
@@ -125,7 +126,7 @@ def main(cfg, data_path=None, model_dir=None, save_results=True):
                 break
 
     # --- Save Results as JSON ---
-    if base_cfg.get("save_results", True):
+    if save_results:
         save_and_plot_train_results(
             results,
             cfg,
