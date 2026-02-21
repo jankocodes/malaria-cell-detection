@@ -71,6 +71,8 @@ def main(cfg, data_path=None, model_dir=None, save_results=True):
     steps_per_epoch = len(train_loader)
     max_lr = [pg["lr"] for pg in optimizer.param_groups]
     warmup = train_cfg["warmup"]
+    div_factor = train_cfg.get("div_factor")
+    three_phase = train_cfg.get("three_phase", False)
 
     scheduler = OneCycleLR(
         optimizer,
@@ -80,8 +82,9 @@ def main(cfg, data_path=None, model_dir=None, save_results=True):
         cycle_momentum=False,
         pct_start=warmup,
         anneal_strategy="cos",
-        div_factor=10,
+        div_factor=div_factor,
         final_div_factor=1000,
+        three_phase=three_phase,
     )
 
     # --- Training Loop ---
