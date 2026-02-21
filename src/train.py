@@ -8,7 +8,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from data.dataset import DatasetType
 
 
-def main(cfg, data_path=None, model_dir=None):
+def main(cfg, data_path=None, model_dir=None, save_results=True):
     set_random_seed(42)
 
     # --- Configs ---
@@ -86,7 +86,7 @@ def main(cfg, data_path=None, model_dir=None):
     # --- Training Loop ---
     print("Starting training...")
 
-    results = {"train_loss": [], "val_loss": []}
+    results = {"train_loss": [], "val_loss": [], "mAP": []}
 
     # Early stopping setup
     patience = train_cfg["patience"]
@@ -108,6 +108,7 @@ def main(cfg, data_path=None, model_dir=None):
         # Log results
         results["train_loss"].append(result.get("train_loss"))
         results["val_loss"].append(result.get("val_loss"))
+        results["mAP"].append(result.get("mAP"))
 
         # Early stopping logic
         val_loss = result.get("val_loss")
@@ -124,11 +125,12 @@ def main(cfg, data_path=None, model_dir=None):
                 break
 
     # --- Save Results as JSON ---
-    save_and_plot_train_results(
-        results,
-        cfg,
-        model_state_dict=best_model_state,
-    )
+    if base_cfg.get("save_results", True):
+        save_and_plot_train_results(
+            results,
+            cfg,
+            model_state_dict=best_model_state,
+        )
 
 
 if __name__ == "__main__":
@@ -144,6 +146,12 @@ if __name__ == "__main__":
     )
     parser.add_argument("--data_path", type=str, help="Override dataset path")
     parser.add_argument("--model_dir", type=str, help="Override model directory path")
+    parser.add_argument(
+        "--save_results",
+        type=bool,
+        default=True,
+        help="Whether to save training results",
+    )
 
     args = parser.parse_args()
 
@@ -157,4 +165,5 @@ if __name__ == "__main__":
         cfg,
         data_path=args.data_path,
         model_dir=args.model_dir,
+        save_results=args.save_results,
     )
