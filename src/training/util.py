@@ -3,6 +3,7 @@ from tqdm import tqdm
 from factory import ModelType
 from wrappers.base import BaseDetectionModel
 from torch.utils.data import DataLoader
+from evaluation.metrics import calculate_ap
 import numpy as np
 import random
 import os
@@ -57,19 +58,12 @@ def train_one_epoch(
     )
 
     for _, (images, targets) in enumerate(training_pbar):
-        images = images.float().to(device)
 
         if len(targets) == 0:
             continue
 
         # Ensure targets are also on the right device
-        coco_targets = [
-            {
-                k: v.to(device) if isinstance(v, torch.Tensor) else v
-                for k, v in t.items()
-            }
-            for t in targets
-        ]
+        images, coco_targets = to_device(images, targets, device)
 
         # Forward
         result = model(images, coco_targets)  # 3 x [B, A, H, W, no]
@@ -84,10 +78,9 @@ def train_one_epoch(
         total_train_loss += train_loss.item()
 
         training_pbar.set_postfix({"loss": f"{train_loss.item():.4f}"})
-    for i, param_group in enumerate(optimizer.param_groups):
-        print(f"Param group {i} LR: {param_group['lr']:.6f}")
 
     # --- Validation ---
+    model.eval()
     with torch.no_grad():
         total_val_loss = 0
 
@@ -96,30 +89,34 @@ def train_one_epoch(
             desc=f"Validation - Epoch {epoch +1}",
         )
 
-        # validation
+        all_predictions = []
+        all_targets = []
+
         for _, (images, targets) in enumerate(val_pbar):
-            images = images.float().to(device)
 
             if len(targets) == 0:
                 continue
 
-            coco_targets = [
-                {
-                    k: v.to(device) if isinstance(v, torch.Tensor) else v
-                    for k, v in t.items()
-                }
-                for t in targets
-            ]
+            images, coco_targets = to_device(images, targets, device)
 
-            # Forward
-            loss = model(images, coco_targets)  # 3 x [B, A, H, W, no]
+            outputs = model(images, coco_targets, return_predictions=True)
+            val_loss = outputs["loss"]
+            predictions = outputs["predictions"]
 
-            val_loss = loss["loss"]
             total_val_loss += val_loss.item()
+            all_predictions.extend(predictions)
+            all_targets.extend(coco_targets)
 
             val_pbar.set_postfix({"loss": f"{val_loss.item():.4f}"})
 
+    model.train()
+
     result = {}
+    result["mAP"] = calculate_ap(
+        predictions=all_predictions,
+        targets=all_targets,
+        num_classes=model.num_classes,
+    )
     result["train_loss"] = total_train_loss / len(train_loader)
     result["val_loss"] = total_val_loss / len(val_loader)
 
@@ -128,6 +125,15 @@ def train_one_epoch(
     )
 
     return result
+
+
+def to_device(images, targets, device):
+    images = images.float().to(device)
+    coco_targets = [
+        {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in t.items()}
+        for t in targets
+    ]
+    return images, coco_targets
 
 
 def get_optimizer(

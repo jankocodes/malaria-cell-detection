@@ -90,22 +90,80 @@ class RetinaNetWrapper(BaseDetectionModel):
 
         print(f"✅ Updated model to {num_classes} classes")
 
-    def predict(self, images: torch.Tensor, conf_thresh=0.5, iou_thresh=0.5):
+    def _forward(
+        self, images: torch.Tensor, targets=None, return_predictions=False
+    ) -> Dict[str, torch.Tensor]:
         """
-        Run inference and post-process outputs.
+        Training forward pass.
+        Ensures the underlying model is in train mode regardless of wrapper state,
+        because torchvision RetinaNet only returns losses in train mode.
+        """
+        result = {}
+
+        was_training = self.model.training
+        if not was_training:
+            self.model.train()
+
+        if targets is not None:
+            # Convert target boxes to xyxy format
+            coco_targets = self._convert_targets_xyxy(targets)
+
+            # Forward pass
+            outputs = self.model(images, coco_targets)  # returns losses
+            total_loss = self._get_loss(outputs)
+            result["loss"] = total_loss
+
+        if targets is None or return_predictions:
+            predictions = self._predict(images)
+            result["predictions"] = predictions
+
+        return result
+
+    def _predict(
+        self,
+        images: torch.Tensor,
+        postprocess: bool = True,
+        conf_thresh=0.5,
+        iou_thresh=0.5,
+    ):
+        """
+        Predict method for inference.
 
         Args:
-            images (torch.Tensor): Batch of input images, shape [B, 3, H, W].
-            conf_thresh (float): Confidence threshold for filtering boxes.
-            iou_thresh (float): IoU threshold for NMS.
-
+            images: Input images tensor.
+            postprocess: Whether to apply post-processing (NMS, thresholding).
+            conf_thresh: Confidence threshold for filtering predictions.
+            iou_thresh: IoU threshold for NMS.
         Returns:
             List of dicts per image with keys 'boxes', 'scores', 'labels'.
         """
-        self.model.eval()
-        with torch.no_grad():
-            outputs = self.model(images)
+        was_training = self.model.training
+        if was_training:
+            self.model.eval()
 
+        with torch.no_grad():
+            outputs = self.model(images)  # List of dicts per image
+
+        if was_training:
+            self.model.train()
+
+        if postprocess:
+            outputs = self._post_process(outputs, conf_thresh, iou_thresh)
+
+        return outputs
+
+    def _post_process(self, outputs, conf_thresh=0.005, iou_thresh=0.5):
+        """
+        Post-process raw model outputs to evaluator-ready format.
+
+        Args:
+            outputs: List of dicts with raw model outputs per image.
+            conf_thresh: Confidence threshold for filtering boxes.
+            iou_thresh: IoU threshold for NMS.
+
+        Returns:
+            List of dicts with 'boxes', 'scores', 'labels' per image.
+        """
         processed_outputs = []
         for output in outputs:
             boxes = output["boxes"]
@@ -128,42 +186,23 @@ class RetinaNetWrapper(BaseDetectionModel):
                 {"boxes": boxes, "scores": scores, "labels": labels}
             )
 
-        return {
-            "predictions": processed_outputs,
-        }
+        return processed_outputs
 
-    def _forward_eval(self, images: torch.Tensor) -> Dict[str, List[torch.Tensor]]:
+    def _get_loss(self, outputs: Dict[str, torch.Tensor]) -> torch.Tensor:
         """
-        Forward pass for evaluation — returns processed predictions.
+        Extract total loss from model outputs.
 
         Args:
-            images (torch.Tensor): Batch of input images, shape [B, 3, H, W].
+            outputs: Dict containing model losses, expected keys:
+                     - 'classification' or 'loss_classifier'
+                     - 'bbox_regression' or 'loss_box_reg'
+        Returns:
+            Total loss tensor.
         """
-        with torch.no_grad():
-            outputs = self.model(images)  # List of dicts per image
-
-        return {
-            "predictions": outputs,
-        }
-
-    def _forward_train(self, images: torch.Tensor, targets) -> Dict[str, torch.Tensor]:
-        """
-        Training forward pass.
-        """
-        # Convert target boxes to xyxy format
-        coco_targets = self._convert_targets_xyxy(targets)
-
-        # Forward pass
-        outputs = self.model(images, coco_targets)  # returns losses
-
-        # Assuming your outputs dict contains classification and bbox_regression
         cls_loss = outputs.get("classification", outputs.get("loss_classifier"))
         box_loss = outputs.get("bbox_regression", outputs.get("loss_box_reg"))
         total_loss = cls_loss + box_loss
-
-        return {
-            "loss": total_loss,
-        }
+        return total_loss
 
     def _convert_targets_xyxy(
         self, targets: List[Dict[str, torch.Tensor]]

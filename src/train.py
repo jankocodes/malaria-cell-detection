@@ -8,7 +8,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from data.dataset import DatasetType
 
 
-def main(cfg, data_path=None, model_dir=None):
+def main(cfg, data_path=None, model_dir=None, save_results=True):
     set_random_seed(42)
 
     # --- Configs ---
@@ -70,6 +70,9 @@ def main(cfg, data_path=None, model_dir=None):
     num_epochs = train_cfg["num_epochs"]
     steps_per_epoch = len(train_loader)
     max_lr = [pg["lr"] for pg in optimizer.param_groups]
+    warmup = train_cfg["warmup"]
+    div_factor = train_cfg.get("div_factor")
+    three_phase = train_cfg.get("three_phase", False)
 
     scheduler = OneCycleLR(
         optimizer,
@@ -77,16 +80,17 @@ def main(cfg, data_path=None, model_dir=None):
         steps_per_epoch=steps_per_epoch,
         epochs=num_epochs,
         cycle_momentum=False,
-        pct_start=0.1,
+        pct_start=warmup,
         anneal_strategy="cos",
-        div_factor=10,
+        div_factor=div_factor,
         final_div_factor=1000,
+        three_phase=three_phase,
     )
 
     # --- Training Loop ---
     print("Starting training...")
 
-    results = {"train_loss": [], "val_loss": []}
+    results = {"train_loss": [], "val_loss": [], "mAP": []}
 
     # Early stopping setup
     patience = train_cfg["patience"]
@@ -108,6 +112,7 @@ def main(cfg, data_path=None, model_dir=None):
         # Log results
         results["train_loss"].append(result.get("train_loss"))
         results["val_loss"].append(result.get("val_loss"))
+        results["mAP"].append(result.get("mAP"))
 
         # Early stopping logic
         val_loss = result.get("val_loss")
@@ -124,11 +129,12 @@ def main(cfg, data_path=None, model_dir=None):
                 break
 
     # --- Save Results as JSON ---
-    save_and_plot_train_results(
-        results,
-        cfg,
-        model_state_dict=best_model_state,
-    )
+    if save_results:
+        save_and_plot_train_results(
+            results,
+            cfg,
+            model_state_dict=best_model_state,
+        )
 
 
 if __name__ == "__main__":
@@ -144,6 +150,12 @@ if __name__ == "__main__":
     )
     parser.add_argument("--data_path", type=str, help="Override dataset path")
     parser.add_argument("--model_dir", type=str, help="Override model directory path")
+    parser.add_argument(
+        "--save_results",
+        type=bool,
+        default=True,
+        help="Whether to save training results",
+    )
 
     args = parser.parse_args()
 
@@ -157,4 +169,5 @@ if __name__ == "__main__":
         cfg,
         data_path=args.data_path,
         model_dir=args.model_dir,
+        save_results=args.save_results,
     )
