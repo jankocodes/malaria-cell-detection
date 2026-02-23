@@ -6,13 +6,24 @@ import matplotlib.patches as patches
 
 
 def save_ap_results(
-    metrics, model_type, pretrained_str, data_path, num_img, num_classes, iou_theshold
+    metrics,
+    model_type,
+    external,
+    pretrained_str,
+    data_path,
+    num_img,
+    num_classes,
+    iou_theshold,
 ):
+    split = "external" if external else "internal"
+
     # Output path with pretrained subfolder
-    output_dir = os.path.join("results", "eval", pretrained_str)
+    output_dir = os.path.join("results", "eval", split, pretrained_str)
     os.makedirs(output_dir, exist_ok=True)
 
-    output_path = os.path.join(output_dir, f"{model_type}_ap{iou_theshold}.json")
+    output_path = os.path.join(
+        output_dir, f"{model_type}_ap{iou_theshold*100:.0f}.json"
+    )
 
     # Build results dictionary
     results = {
