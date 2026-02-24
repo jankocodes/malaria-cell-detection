@@ -9,13 +9,13 @@ from data.dataset import DatasetType
 
 
 def main(cfg, data_path=None, model_dir=None, save_results=True):
-    set_random_seed(42)
 
     # --- Configs ---
     base_cfg = cfg["base"]
     model_cfg = cfg["model"]
     train_cfg = cfg["train"]
 
+    set_random_seed(base_cfg["seed"])
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
